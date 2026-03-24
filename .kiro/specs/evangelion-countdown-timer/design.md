@@ -2,7 +2,7 @@
 
 ## 概要
 
-本設計ドキュメントは、エヴァンゲリオン風カウントダウンタイマーのデスクトップアプリケーションの技術設計を定義します。Go言語とGioフレームワークを使用し、cgo不要でmacOSとWindowsの両方で動作するクロスプラットフォームアプリケーションとして、エヴァンゲリオンの世界観を再現した視覚的にインパクトのあるタイマーを実装します。
+本設計ドキュメントは、アラート風カウントダウンタイマーのデスクトップアプリケーションの技術設計を定義します。Go言語とGioフレームワークを使用し、cgo不要でmacOSとWindowsの両方で動作するクロスプラットフォームアプリケーションとして、視覚的にインパクトのあるタイマーを実装します。
 
 ### 技術スタック
 
@@ -24,7 +24,7 @@
 
 ```mermaid
 graph TB
-    subgraph "Evangelion Countdown Timer"
+    subgraph "Countdown Timer"
         subgraph "View Layer"
             InputView[時間入力画面]
             CountdownView[カウントダウン画面]
@@ -101,7 +101,7 @@ evangelion-timer/
 │   │   ├── app.go          # メインアプリケーションウィンドウ
 │   │   ├── input.go        # 時間入力画面
 │   │   ├── countdown.go    # カウントダウン画面
-│   │   └── theme.go        # エヴァンゲリオンテーマ
+│   │   └── theme.go        # アラートテーマ
 │   └── animation/
 │       └── alert.go        # 警告アニメーション
 ├── assets/
@@ -216,7 +216,7 @@ type AppConfig struct {
 
 ### ミリ秒アニメーション
 
-エヴァンゲリオン風の高速ミリ秒表示を実現するため、以下の仕様でアニメーションを実装します：
+アラート風の高速ミリ秒表示を実現するため、以下の仕様でアニメーションを実装します：
 
 - **更新頻度**: 約60fps（16ms間隔）でミリ秒表示を更新
 - **表示方式**: 実際のミリ秒ではなく、視覚的な演出として高速でカウントアップ/ダウンする数値を表示
@@ -358,12 +358,12 @@ evangelion-timer/
 
 - 各プロパティテストは最低100回のイテレーションを実行
 - 各テストは設計ドキュメントのプロパティを参照するタグを含む
-- タグ形式: `Feature: evangelion-countdown-timer, Property {number}: {property_text}`
+- タグ形式: `Feature: countdown-timer, Property {number}: {property_text}`
 
 ### テスト例
 
 ```go
-// Feature: evangelion-countdown-timer, Property 1: 入力バリデーションの正確性
+// Feature: countdown-timer, Property 1: 入力バリデーションの正確性
 func TestValidation_Property1(t *testing.T) {
     properties := gopter.NewProperties(gopter.DefaultTestParameters())
     
@@ -386,7 +386,7 @@ func TestValidation_Property1(t *testing.T) {
     properties.TestingRun(t)
 }
 
-// Feature: evangelion-countdown-timer, Property 7: 負の値の表示フォーマット
+// Feature: countdown-timer, Property 7: 負の値の表示フォーマット
 func TestFormat_Property7(t *testing.T) {
     properties := gopter.NewProperties(gopter.DefaultTestParameters())
     
