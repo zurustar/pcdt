@@ -375,7 +375,7 @@ func (s *CountdownScreen) layoutStatusIndicator(gtx layout.Context, th *material
 		statusText = "PAUSED"
 		statusColor = s.Theme.WarningColor
 	case model.IsRunning():
-		statusText = "RUNNING"
+		statusText = ""
 		statusColor = s.Theme.TextColorNormal
 	default:
 		statusText = "READY"
