@@ -51,4 +51,4 @@ go test ./...
 
 ## ライセンス
 
-MIT License
+GPL-3.0 License
