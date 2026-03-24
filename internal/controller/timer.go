@@ -6,7 +6,7 @@ import (
 	"sync"
 	"time"
 
-	"evangelion-timer/internal/model"
+	"countdown-timer/internal/model"
 )
 
 // ErrInvalidStartSeconds is returned when trying to start with invalid seconds

@@ -1,4 +1,4 @@
-module evangelion-timer
+module countdown-timer
 
 go 1.25.7
 

@@ -7,8 +7,8 @@ import (
 	"gioui.org/app"
 	"gioui.org/unit"
 
-	"evangelion-timer/internal/controller"
-	"evangelion-timer/internal/model"
+	"countdown-timer/internal/controller"
+	"countdown-timer/internal/model"
 )
 
 // ScreenState represents the current screen of the application

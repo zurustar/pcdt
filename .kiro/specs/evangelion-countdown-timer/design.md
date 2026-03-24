@@ -88,7 +88,7 @@ stateDiagram-v2
 ### パッケージ構成
 
 ```
-evangelion-timer/
+countdown-timer/
 ├── main.go                 # エントリーポイント
 ├── internal/
 │   ├── model/
@@ -343,7 +343,7 @@ Go言語では `github.com/leanovate/gopter` を使用します。
 ### テスト構成
 
 ```
-evangelion-timer/
+countdown-timer/
 ├── internal/
 │   ├── model/
 │   │   └── timer_test.go       # タイマーモデルのテスト

@@ -11,9 +11,9 @@ import (
 	"gioui.org/op"
 	"gioui.org/widget/material"
 
-	"evangelion-timer/internal/controller"
-	"evangelion-timer/internal/model"
-	"evangelion-timer/internal/view"
+	"countdown-timer/internal/controller"
+	"countdown-timer/internal/model"
+	"countdown-timer/internal/view"
 )
 
 func main() {

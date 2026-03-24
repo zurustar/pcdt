@@ -16,7 +16,7 @@ import (
 	"gioui.org/widget"
 	"gioui.org/widget/material"
 
-	"evangelion-timer/internal/controller"
+	"countdown-timer/internal/controller"
 )
 
 // InputScreen represents the time input screen for the countdown timer.

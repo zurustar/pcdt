@@ -8,7 +8,7 @@ Go言語とGioフレームワークを使用し、cgo不要でmacOSとWindowsの
 
 - [ ] 1. プロジェクト構造とコアインターフェースのセットアップ
   - [x] 1.1 Go modulesの初期化とGio依存関係の追加
-    - `go mod init evangelion-timer` を実行
+    - `go mod init countdown-timer` を実行
     - `gioui.org` パッケージを追加
     - `github.com/leanovate/gopter` をテスト用に追加
     - _Requirements: 6.1_

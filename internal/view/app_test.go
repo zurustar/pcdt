@@ -6,8 +6,8 @@ import (
 
 	"gioui.org/unit"
 
-	"evangelion-timer/internal/controller"
-	"evangelion-timer/internal/model"
+	"countdown-timer/internal/controller"
+	"countdown-timer/internal/model"
 )
 
 func TestScreenState_String(t *testing.T) {
