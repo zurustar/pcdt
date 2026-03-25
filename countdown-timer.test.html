@@ -1,0 +1,2137 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>カウントダウンタイマー ユニットテスト</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background-color: #1a1a1a;
+            color: #fff;
+            padding: 20px;
+            max-width: 900px;
+            margin: 0 auto;
+        }
+        
+        h1 {
+            color: #ff0000;
+            border-bottom: 2px solid #ff0000;
+            padding-bottom: 10px;
+        }
+        
+        h2 {
+            color: #ff6666;
+            margin-top: 30px;
+        }
+        
+        .test-suite {
+            margin: 20px 0;
+            padding: 15px;
+            background-color: #2a2a2a;
+            border-radius: 8px;
+        }
+        
+        .test-case {
+            padding: 8px 12px;
+            margin: 5px 0;
+            border-radius: 4px;
+            font-family: monospace;
+        }
+        
+        .pass {
+            background-color: #1a3d1a;
+            border-left: 4px solid #00ff00;
+        }
+        
+        .fail {
+            background-color: #3d1a1a;
+            border-left: 4px solid #ff0000;
+        }
+        
+        .summary {
+            margin-top: 30px;
+            padding: 20px;
+            background-color: #333;
+            border-radius: 8px;
+            font-size: 1.2em;
+        }
+        
+        .summary.all-pass {
+            border: 2px solid #00ff00;
+        }
+        
+        .summary.has-fail {
+            border: 2px solid #ff0000;
+        }
+        
+        .pass-count { color: #00ff00; }
+        .fail-count { color: #ff0000; }
+    </style>
+</head>
+<body>
+    <h1>カウントダウンタイマー ユニットテスト</h1>
+    <p>要件: 1.4, 1.5, 1.6, 3.1, 3.2, 3.3, 3.4, 4.1, 4.2</p>
+    
+    <div id="test-results"></div>
+    <div id="summary" class="summary"></div>
+
+    <script>
+        /**
+         * 時間入力の検証を行うバリデーター
+         * Requirements: 1.4, 1.5, 1.6
+         */
+        class InputValidator {
+            validateMinutes(value) {
+                const parsed = this._parseInteger(value);
+                
+                if (parsed.error) {
+                    return { valid: false, error: parsed.error };
+                }
+                
+                const num = parsed.value;
+                
+                if (num < 0 || num > 99) {
+                    return { valid: false, error: '分は0〜99の範囲で入力してください' };
+                }
+                
+                return { valid: true };
+            }
+            
+            validateSeconds(value) {
+                const parsed = this._parseInteger(value);
+                
+                if (parsed.error) {
+                    return { valid: false, error: parsed.error };
+                }
+                
+                const num = parsed.value;
+                
+                if (num < 0 || num > 59) {
+                    return { valid: false, error: '秒は0〜59の範囲で入力してください' };
+                }
+                
+                return { valid: true };
+            }
+            
+            validateTotal(minutes, seconds) {
+                const minutesResult = this.validateMinutes(minutes);
+                if (!minutesResult.valid) {
+                    return minutesResult;
+                }
+                
+                const secondsResult = this.validateSeconds(seconds);
+                if (!secondsResult.valid) {
+                    return secondsResult;
+                }
+                
+                const totalSeconds = this._parseInteger(minutes).value * 60 + this._parseInteger(seconds).value;
+                
+                if (totalSeconds === 0) {
+                    return { valid: false, error: '1秒以上の時間を入力してください' };
+                }
+                
+                if (totalSeconds > 5999) {
+                    return { valid: false, error: '最大99分59秒まで設定できます' };
+                }
+                
+                return { valid: true };
+            }
+            
+            _parseInteger(value) {
+                if (value === '' || value === null || value === undefined) {
+                    return { error: '値を入力してください' };
+                }
+                
+                const num = Number(value);
+                
+                if (isNaN(num)) {
+                    return { error: '数値を入力してください' };
+                }
+                
+                if (!Number.isInteger(num)) {
+                    return { error: '整数を入力してください' };
+                }
+                
+                return { value: num };
+            }
+        }
+
+        // Simple Test Runner
+        class TestRunner {
+            constructor() {
+                this.results = [];
+                this.passCount = 0;
+                this.failCount = 0;
+            }
+
+            test(description, testFn) {
+                try {
+                    testFn();
+                    this.results.push({ description, passed: true });
+                    this.passCount++;
+                    console.log(`✓ ${description}`);
+                } catch (error) {
+                    this.results.push({ description, passed: false, error: error.message });
+                    this.failCount++;
+                    console.error(`✗ ${description}: ${error.message}`);
+                }
+            }
+
+            assertEqual(actual, expected, message = '') {
+                if (actual !== expected) {
+                    throw new Error(`${message} Expected: ${expected}, Actual: ${actual}`);
+                }
+            }
+
+            assertTrue(value, message = '') {
+                if (value !== true) {
+                    throw new Error(`${message} Expected true, got: ${value}`);
+                }
+            }
+
+            assertFalse(value, message = '') {
+                if (value !== false) {
+                    throw new Error(`${message} Expected false, got: ${value}`);
+                }
+            }
+
+            renderResults(containerId) {
+                const container = document.getElementById(containerId);
+                let html = '';
+                
+                this.results.forEach(result => {
+                    const className = result.passed ? 'pass' : 'fail';
+                    const icon = result.passed ? '✓' : '✗';
+                    const errorMsg = result.error ? ` - ${result.error}` : '';
+                    html += `<div class="test-case ${className}">${icon} ${result.description}${errorMsg}</div>`;
+                });
+                
+                container.innerHTML = html;
+            }
+
+            renderSummary(containerId) {
+                const container = document.getElementById(containerId);
+                const total = this.passCount + this.failCount;
+                const allPass = this.failCount === 0;
+                
+                container.className = `summary ${allPass ? 'all-pass' : 'has-fail'}`;
+                container.innerHTML = `
+                    <strong>テスト結果:</strong> 
+                    <span class="pass-count">${this.passCount} passed</span> / 
+                    <span class="fail-count">${this.failCount} failed</span> / 
+                    ${total} total
+                `;
+            }
+        }
+
+        // Run Tests
+        const runner = new TestRunner();
+        const validator = new InputValidator();
+
+        // ========================================
+        // validateMinutes テスト
+        // ========================================
+        console.log('\n=== validateMinutes Tests ===');
+
+        // 有効な入力値のテスト
+        runner.test('validateMinutes: 0は有効', () => {
+            const result = validator.validateMinutes(0);
+            runner.assertTrue(result.valid);
+        });
+
+        runner.test('validateMinutes: 30は有効', () => {
+            const result = validator.validateMinutes(30);
+            runner.assertTrue(result.valid);
+        });
+
+        runner.test('validateMinutes: 50は有効', () => {
+            const result = validator.validateMinutes(50);
+            runner.assertTrue(result.valid);
+        });
+
+        runner.test('validateMinutes: 99は有効（境界値）', () => {
+            const result = validator.validateMinutes(99);
+            runner.assertTrue(result.valid);
+        });
+
+        runner.test('validateMinutes: 文字列"50"は有効', () => {
+            const result = validator.validateMinutes('50');
+            runner.assertTrue(result.valid);
+        });
+
+        // 無効な入力値のテスト
+        runner.test('validateMinutes: -1は無効', () => {
+            const result = validator.validateMinutes(-1);
+            runner.assertFalse(result.valid);
+        });
+
+        runner.test('validateMinutes: 100は無効', () => {
+            const result = validator.validateMinutes(100);
+            runner.assertFalse(result.valid);
+        });
+
+        runner.test('validateMinutes: 空文字列は無効', () => {
+            const result = validator.validateMinutes('');
+            runner.assertFalse(result.valid);
+        });
+
+        runner.test('validateMinutes: nullは無効', () => {
+            const result = validator.validateMinutes(null);
+            runner.assertFalse(result.valid);
+        });
+
+        runner.test('validateMinutes: undefinedは無効', () => {
+            const result = validator.validateMinutes(undefined);
+            runner.assertFalse(result.valid);
+        });
+
+        runner.test('validateMinutes: "abc"は無効（非数値）', () => {
+            const result = validator.validateMinutes('abc');
+            runner.assertFalse(result.valid);
+        });
+
+        runner.test('validateMinutes: 1.5は無効（小数）', () => {
+            const result = validator.validateMinutes(1.5);
+            runner.assertFalse(result.valid);
+        });
+
+        // ========================================
+        // validateSeconds テスト
+        // ========================================
+        console.log('\n=== validateSeconds Tests ===');
+
+        // 有効な入力値のテスト
+        runner.test('validateSeconds: 0は有効', () => {
+            const result = validator.validateSeconds(0);
+            runner.assertTrue(result.valid);
+        });
+
+        runner.test('validateSeconds: 30は有効', () => {
+            const result = validator.validateSeconds(30);
+            runner.assertTrue(result.valid);
+        });
+
+        runner.test('validateSeconds: 59は有効（境界値）', () => {
+            const result = validator.validateSeconds(59);
+            runner.assertTrue(result.valid);
+        });
+
+        runner.test('validateSeconds: 文字列"30"は有効', () => {
+            const result = validator.validateSeconds('30');
+            runner.assertTrue(result.valid);
+        });
+
+        // 無効な入力値のテスト
+        runner.test('validateSeconds: -1は無効', () => {
+            const result = validator.validateSeconds(-1);
+            runner.assertFalse(result.valid);
+        });
+
+        runner.test('validateSeconds: 60は無効', () => {
+            const result = validator.validateSeconds(60);
+            runner.assertFalse(result.valid);
+        });
+
+        runner.test('validateSeconds: 空文字列は無効', () => {
+            const result = validator.validateSeconds('');
+            runner.assertFalse(result.valid);
+        });
+
+        runner.test('validateSeconds: nullは無効', () => {
+            const result = validator.validateSeconds(null);
+            runner.assertFalse(result.valid);
+        });
+
+        runner.test('validateSeconds: undefinedは無効', () => {
+            const result = validator.validateSeconds(undefined);
+            runner.assertFalse(result.valid);
+        });
+
+        runner.test('validateSeconds: "xyz"は無効（非数値）', () => {
+            const result = validator.validateSeconds('xyz');
+            runner.assertFalse(result.valid);
+        });
+
+        runner.test('validateSeconds: 30.5は無効（小数）', () => {
+            const result = validator.validateSeconds(30.5);
+            runner.assertFalse(result.valid);
+        });
+
+        // ========================================
+        // validateTotal テスト
+        // ========================================
+        console.log('\n=== validateTotal Tests ===');
+
+        // 有効な入力値のテスト
+        runner.test('validateTotal: 0分1秒は有効（最小境界値）', () => {
+            const result = validator.validateTotal(0, 1);
+            runner.assertTrue(result.valid);
+        });
+
+        runner.test('validateTotal: 1分0秒は有効', () => {
+            const result = validator.validateTotal(1, 0);
+            runner.assertTrue(result.valid);
+        });
+
+        runner.test('validateTotal: 5分30秒は有効', () => {
+            const result = validator.validateTotal(5, 30);
+            runner.assertTrue(result.valid);
+        });
+
+        runner.test('validateTotal: 99分59秒は有効（最大境界値）', () => {
+            const result = validator.validateTotal(99, 59);
+            runner.assertTrue(result.valid);
+        });
+
+        runner.test('validateTotal: 文字列"10"と"30"は有効', () => {
+            const result = validator.validateTotal('10', '30');
+            runner.assertTrue(result.valid);
+        });
+
+        // 無効な入力値のテスト - 合計時間0秒
+        runner.test('validateTotal: 0分0秒は無効（合計0秒）', () => {
+            const result = validator.validateTotal(0, 0);
+            runner.assertFalse(result.valid);
+        });
+
+        // 無効な入力値のテスト - 分が無効
+        runner.test('validateTotal: 分が-1は無効', () => {
+            const result = validator.validateTotal(-1, 30);
+            runner.assertFalse(result.valid);
+        });
+
+        runner.test('validateTotal: 分が100は無効', () => {
+            const result = validator.validateTotal(100, 0);
+            runner.assertFalse(result.valid);
+        });
+
+        // 無効な入力値のテスト - 秒が無効
+        runner.test('validateTotal: 秒が-1は無効', () => {
+            const result = validator.validateTotal(5, -1);
+            runner.assertFalse(result.valid);
+        });
+
+        runner.test('validateTotal: 秒が60は無効', () => {
+            const result = validator.validateTotal(5, 60);
+            runner.assertFalse(result.valid);
+        });
+
+        // 無効な入力値のテスト - 非数値
+        runner.test('validateTotal: 分が非数値は無効', () => {
+            const result = validator.validateTotal('abc', 30);
+            runner.assertFalse(result.valid);
+        });
+
+        runner.test('validateTotal: 秒が非数値は無効', () => {
+            const result = validator.validateTotal(5, 'xyz');
+            runner.assertFalse(result.valid);
+        });
+
+        // 無効な入力値のテスト - 空値
+        runner.test('validateTotal: 分が空文字列は無効', () => {
+            const result = validator.validateTotal('', 30);
+            runner.assertFalse(result.valid);
+        });
+
+        runner.test('validateTotal: 秒が空文字列は無効', () => {
+            const result = validator.validateTotal(5, '');
+            runner.assertFalse(result.valid);
+        });
+
+        // 境界値テスト - エラーメッセージの確認
+        runner.test('validateTotal: 0分0秒のエラーメッセージ確認', () => {
+            const result = validator.validateTotal(0, 0);
+            runner.assertEqual(result.error, '1秒以上の時間を入力してください');
+        });
+
+        runner.test('validateMinutes: 範囲外のエラーメッセージ確認', () => {
+            const result = validator.validateMinutes(100);
+            runner.assertEqual(result.error, '分は0〜99の範囲で入力してください');
+        });
+
+        runner.test('validateSeconds: 範囲外のエラーメッセージ確認', () => {
+            const result = validator.validateSeconds(60);
+            runner.assertEqual(result.error, '秒は0〜59の範囲で入力してください');
+        });
+
+        // ========================================
+        // TimerModel クラス定義
+        // ========================================
+        
+        /**
+         * タイマーの状態を保持するモデル
+         * Requirements: 3.1, 4.1, 4.2
+         */
+        class TimerModel {
+            constructor() {
+                /** @type {number} 初期設定秒数 */
+                this.initialSeconds = 0;
+                /** @type {number} 残りミリ秒（負の値も可） */
+                this.remainingMs = 0;
+                /** @type {'idle'|'running'|'paused'} 現在の状態 */
+                this.status = 'idle';
+                /** @type {number|null} 最後のティック時刻（performance.now()） */
+                this.lastTickTime = null;
+            }
+            
+            /**
+             * 残り秒数を取得（負の値も可）
+             * 小数点以下は切り捨て（負の場合は切り上げ方向）
+             * @returns {number} 残り秒数
+             */
+            getRemainingSeconds() {
+                // Math.trunc を使用して0方向への切り捨て
+                // 正の値: 1500ms -> 1秒, 負の値: -1500ms -> -1秒
+                return Math.trunc(this.remainingMs / 1000);
+            }
+            
+            /**
+             * 超過状態（マイナス）かを判定
+             * @returns {boolean} 残り時間が負の場合true
+             */
+            isNegative() {
+                return this.remainingMs < 0;
+            }
+            
+            /**
+             * 実行中かを判定
+             * @returns {boolean} 実行中の場合true
+             */
+            isRunning() {
+                return this.status === 'running';
+            }
+            
+            /**
+             * 一時停止中かを判定
+             * @returns {boolean} 一時停止中の場合true
+             */
+            isPaused() {
+                return this.status === 'paused';
+            }
+        }
+
+        // ========================================
+        // TimerModel テスト
+        // Requirements: 3.1, 4.1, 4.2
+        // ========================================
+        console.log('\n=== TimerModel Tests ===');
+
+        // --- 初期状態のテスト ---
+        runner.test('TimerModel: 初期状態はidle', () => {
+            const model = new TimerModel();
+            runner.assertEqual(model.status, 'idle');
+        });
+
+        runner.test('TimerModel: 初期残り時間は0', () => {
+            const model = new TimerModel();
+            runner.assertEqual(model.getRemainingSeconds(), 0);
+        });
+
+        runner.test('TimerModel: 初期状態でisRunningはfalse', () => {
+            const model = new TimerModel();
+            runner.assertFalse(model.isRunning());
+        });
+
+        runner.test('TimerModel: 初期状態でisPausedはfalse', () => {
+            const model = new TimerModel();
+            runner.assertFalse(model.isPaused());
+        });
+
+        runner.test('TimerModel: 初期状態でisNegativeはfalse', () => {
+            const model = new TimerModel();
+            runner.assertFalse(model.isNegative());
+        });
+
+        runner.test('TimerModel: 初期状態でlastTickTimeはnull', () => {
+            const model = new TimerModel();
+            runner.assertEqual(model.lastTickTime, null);
+        });
+
+        // --- getRemainingSeconds テスト（正の値） ---
+        runner.test('TimerModel: getRemainingSeconds - 正の値（5000ms -> 5秒）', () => {
+            const model = new TimerModel();
+            model.remainingMs = 5000;
+            runner.assertEqual(model.getRemainingSeconds(), 5);
+        });
+
+        runner.test('TimerModel: getRemainingSeconds - 正の値（5999ms -> 5秒、切り捨て）', () => {
+            const model = new TimerModel();
+            model.remainingMs = 5999;
+            runner.assertEqual(model.getRemainingSeconds(), 5);
+        });
+
+        runner.test('TimerModel: getRemainingSeconds - 正の値（1ms -> 0秒）', () => {
+            const model = new TimerModel();
+            model.remainingMs = 1;
+            runner.assertEqual(model.getRemainingSeconds(), 0);
+        });
+
+        runner.test('TimerModel: getRemainingSeconds - 正の値（999ms -> 0秒）', () => {
+            const model = new TimerModel();
+            model.remainingMs = 999;
+            runner.assertEqual(model.getRemainingSeconds(), 0);
+        });
+
+        runner.test('TimerModel: getRemainingSeconds - 正の値（1000ms -> 1秒）', () => {
+            const model = new TimerModel();
+            model.remainingMs = 1000;
+            runner.assertEqual(model.getRemainingSeconds(), 1);
+        });
+
+        // --- getRemainingSeconds テスト（ゼロ） ---
+        runner.test('TimerModel: getRemainingSeconds - ゼロ（0ms -> 0秒）', () => {
+            const model = new TimerModel();
+            model.remainingMs = 0;
+            runner.assertEqual(model.getRemainingSeconds(), 0);
+        });
+
+        // --- getRemainingSeconds テスト（負の値） ---
+        runner.test('TimerModel: getRemainingSeconds - 負の値（-1000ms -> -1秒）', () => {
+            const model = new TimerModel();
+            model.remainingMs = -1000;
+            runner.assertEqual(model.getRemainingSeconds(), -1);
+        });
+
+        runner.test('TimerModel: getRemainingSeconds - 負の値（-1500ms -> -1秒、0方向への切り捨て）', () => {
+            const model = new TimerModel();
+            model.remainingMs = -1500;
+            runner.assertEqual(model.getRemainingSeconds(), -1);
+        });
+
+        runner.test('TimerModel: getRemainingSeconds - 負の値（-999ms -> 0秒）', () => {
+            const model = new TimerModel();
+            model.remainingMs = -999;
+            runner.assertEqual(model.getRemainingSeconds(), 0);
+        });
+
+        runner.test('TimerModel: getRemainingSeconds - 負の値（-1ms -> 0秒）', () => {
+            const model = new TimerModel();
+            model.remainingMs = -1;
+            runner.assertEqual(model.getRemainingSeconds(), 0);
+        });
+
+        runner.test('TimerModel: getRemainingSeconds - 負の値（-5000ms -> -5秒）', () => {
+            const model = new TimerModel();
+            model.remainingMs = -5000;
+            runner.assertEqual(model.getRemainingSeconds(), -5);
+        });
+
+        // --- isNegative テスト ---
+        runner.test('TimerModel: isNegative - 正の値はfalse', () => {
+            const model = new TimerModel();
+            model.remainingMs = 5000;
+            runner.assertFalse(model.isNegative());
+        });
+
+        runner.test('TimerModel: isNegative - ゼロはfalse', () => {
+            const model = new TimerModel();
+            model.remainingMs = 0;
+            runner.assertFalse(model.isNegative());
+        });
+
+        runner.test('TimerModel: isNegative - 負の値はtrue', () => {
+            const model = new TimerModel();
+            model.remainingMs = -1;
+            runner.assertTrue(model.isNegative());
+        });
+
+        runner.test('TimerModel: isNegative - 大きな負の値はtrue', () => {
+            const model = new TimerModel();
+            model.remainingMs = -60000;
+            runner.assertTrue(model.isNegative());
+        });
+
+        // --- isRunning テスト ---
+        runner.test('TimerModel: isRunning - statusがrunningの場合true', () => {
+            const model = new TimerModel();
+            model.status = 'running';
+            runner.assertTrue(model.isRunning());
+        });
+
+        runner.test('TimerModel: isRunning - statusがidleの場合false', () => {
+            const model = new TimerModel();
+            model.status = 'idle';
+            runner.assertFalse(model.isRunning());
+        });
+
+        runner.test('TimerModel: isRunning - statusがpausedの場合false', () => {
+            const model = new TimerModel();
+            model.status = 'paused';
+            runner.assertFalse(model.isRunning());
+        });
+
+        // --- isPaused テスト ---
+        runner.test('TimerModel: isPaused - statusがpausedの場合true', () => {
+            const model = new TimerModel();
+            model.status = 'paused';
+            runner.assertTrue(model.isPaused());
+        });
+
+        runner.test('TimerModel: isPaused - statusがidleの場合false', () => {
+            const model = new TimerModel();
+            model.status = 'idle';
+            runner.assertFalse(model.isPaused());
+        });
+
+        runner.test('TimerModel: isPaused - statusがrunningの場合false', () => {
+            const model = new TimerModel();
+            model.status = 'running';
+            runner.assertFalse(model.isPaused());
+        });
+
+        // --- 状態遷移のテスト（idle -> running -> paused -> running） ---
+        runner.test('TimerModel: 状態遷移 idle -> running', () => {
+            const model = new TimerModel();
+            runner.assertEqual(model.status, 'idle');
+            runner.assertFalse(model.isRunning());
+            
+            model.status = 'running';
+            runner.assertEqual(model.status, 'running');
+            runner.assertTrue(model.isRunning());
+            runner.assertFalse(model.isPaused());
+        });
+
+        runner.test('TimerModel: 状態遷移 running -> paused', () => {
+            const model = new TimerModel();
+            model.status = 'running';
+            runner.assertTrue(model.isRunning());
+            
+            model.status = 'paused';
+            runner.assertEqual(model.status, 'paused');
+            runner.assertFalse(model.isRunning());
+            runner.assertTrue(model.isPaused());
+        });
+
+        runner.test('TimerModel: 状態遷移 paused -> running', () => {
+            const model = new TimerModel();
+            model.status = 'paused';
+            runner.assertTrue(model.isPaused());
+            
+            model.status = 'running';
+            runner.assertEqual(model.status, 'running');
+            runner.assertTrue(model.isRunning());
+            runner.assertFalse(model.isPaused());
+        });
+
+        runner.test('TimerModel: 完全な状態遷移サイクル（idle -> running -> paused -> running -> idle）', () => {
+            const model = new TimerModel();
+            
+            // idle
+            runner.assertEqual(model.status, 'idle');
+            runner.assertFalse(model.isRunning());
+            runner.assertFalse(model.isPaused());
+            
+            // idle -> running
+            model.status = 'running';
+            runner.assertTrue(model.isRunning());
+            runner.assertFalse(model.isPaused());
+            
+            // running -> paused
+            model.status = 'paused';
+            runner.assertFalse(model.isRunning());
+            runner.assertTrue(model.isPaused());
+            
+            // paused -> running
+            model.status = 'running';
+            runner.assertTrue(model.isRunning());
+            runner.assertFalse(model.isPaused());
+            
+            // running -> idle (reset)
+            model.status = 'idle';
+            runner.assertFalse(model.isRunning());
+            runner.assertFalse(model.isPaused());
+        });
+
+        // --- initialSecondsとremainingMsの関係テスト ---
+        runner.test('TimerModel: initialSecondsの設定', () => {
+            const model = new TimerModel();
+            model.initialSeconds = 300;
+            runner.assertEqual(model.initialSeconds, 300);
+        });
+
+        runner.test('TimerModel: remainingMsの設定と取得', () => {
+            const model = new TimerModel();
+            model.remainingMs = 300000; // 5分 = 300秒 = 300000ms
+            runner.assertEqual(model.getRemainingSeconds(), 300);
+        });
+
+        // --- lastTickTimeのテスト ---
+        runner.test('TimerModel: lastTickTimeの設定', () => {
+            const model = new TimerModel();
+            const now = performance.now();
+            model.lastTickTime = now;
+            runner.assertEqual(model.lastTickTime, now);
+        });
+
+        // ========================================
+        // TimerController クラス定義
+        // ========================================
+        
+        /**
+         * タイマーの制御を行うコントローラー
+         * Requirements: 2.3, 2.4, 3.1, 3.2, 3.3, 3.4, 3.5, 4.1
+         */
+        class TimerController {
+            /**
+             * @param {TimerModel} model - タイマーモデル
+             * @param {function} onUpdate - 更新時に呼び出されるコールバック
+             */
+            constructor(model, onUpdate) {
+                /** @type {TimerModel} */
+                this.model = model;
+                /** @type {function} */
+                this.onUpdate = onUpdate;
+                /** @type {number|null} requestAnimationFrameのID */
+                this._animationFrameId = null;
+            }
+            
+            /**
+             * 指定秒数でカウントダウンを開始
+             * Requirements: 2.3, 2.4
+             * @param {number} seconds - 開始秒数
+             */
+            start(seconds) {
+                // モデルの初期化
+                this.model.initialSeconds = seconds;
+                this.model.remainingMs = seconds * 1000;
+                this.model.status = 'running';
+                this.model.lastTickTime = performance.now();
+                
+                // 更新コールバックを呼び出し
+                if (this.onUpdate) {
+                    this.onUpdate(this.model);
+                }
+                
+                // ティックループを開始
+                this._scheduleNextTick();
+            }
+            
+            /**
+             * カウントダウンを一時停止
+             * Requirements: 3.2, 3.5
+             */
+            pause() {
+                if (!this.model.isRunning()) {
+                    return;
+                }
+                
+                // 現在時刻までの経過時間を反映
+                this._updateRemainingTime();
+                
+                // 状態を一時停止に変更
+                this.model.status = 'paused';
+                this.model.lastTickTime = null;
+                
+                // アニメーションフレームをキャンセル
+                if (this._animationFrameId !== null) {
+                    cancelAnimationFrame(this._animationFrameId);
+                    this._animationFrameId = null;
+                }
+                
+                // 更新コールバックを呼び出し
+                if (this.onUpdate) {
+                    this.onUpdate(this.model);
+                }
+            }
+            
+            /**
+             * カウントダウンを再開
+             * Requirements: 3.3
+             */
+            resume() {
+                if (!this.model.isPaused()) {
+                    return;
+                }
+                
+                // 状態を実行中に変更
+                this.model.status = 'running';
+                this.model.lastTickTime = performance.now();
+                
+                // 更新コールバックを呼び出し
+                if (this.onUpdate) {
+                    this.onUpdate(this.model);
+                }
+                
+                // ティックループを再開
+                this._scheduleNextTick();
+            }
+            
+            /**
+             * タイマーをリセット
+             * Requirements: 3.4
+             */
+            reset() {
+                // アニメーションフレームをキャンセル
+                if (this._animationFrameId !== null) {
+                    cancelAnimationFrame(this._animationFrameId);
+                    this._animationFrameId = null;
+                }
+                
+                // モデルをリセット
+                this.model.initialSeconds = 0;
+                this.model.remainingMs = 0;
+                this.model.status = 'idle';
+                this.model.lastTickTime = null;
+                
+                // 更新コールバックを呼び出し
+                if (this.onUpdate) {
+                    this.onUpdate(this.model);
+                }
+            }
+            
+            /**
+             * 一時停止/再開を切り替え
+             * Requirements: 3.2, 3.3
+             */
+            toggle() {
+                if (this.model.isRunning()) {
+                    this.pause();
+                } else if (this.model.isPaused()) {
+                    this.resume();
+                }
+            }
+            
+            /**
+             * 次のティックをスケジュール
+             * @private
+             */
+            _scheduleNextTick() {
+                this._animationFrameId = requestAnimationFrame(() => this._tick());
+            }
+            
+            /**
+             * ティック処理（1秒ごとの更新）
+             * Requirements: 3.1, 4.1
+             * @private
+             */
+            _tick() {
+                // 実行中でなければ終了
+                if (!this.model.isRunning()) {
+                    return;
+                }
+                
+                // 残り時間を更新
+                const previousSeconds = this.model.getRemainingSeconds();
+                this._updateRemainingTime();
+                const currentSeconds = this.model.getRemainingSeconds();
+                
+                // 秒が変わった場合のみ更新コールバックを呼び出し
+                if (previousSeconds !== currentSeconds) {
+                    if (this.onUpdate) {
+                        this.onUpdate(this.model);
+                    }
+                }
+                
+                // 次のティックをスケジュール（マイナス方向への継続カウント）
+                // Requirements: 4.1 - ゼロ到達後も停止せずマイナス方向へ継続
+                this._scheduleNextTick();
+            }
+            
+            /**
+             * 残り時間を更新
+             * @private
+             */
+            _updateRemainingTime() {
+                if (this.model.lastTickTime === null) {
+                    return;
+                }
+                
+                const now = performance.now();
+                const elapsed = now - this.model.lastTickTime;
+                this.model.remainingMs -= elapsed;
+                this.model.lastTickTime = now;
+            }
+        }
+
+        // ========================================
+        // TimerController テスト
+        // Requirements: 3.2, 3.3, 3.4, 4.1
+        // ========================================
+        console.log('\n=== TimerController Tests ===');
+
+        // --- start() テスト ---
+        runner.test('TimerController: start() - モデルを正しく初期化する', () => {
+            const model = new TimerModel();
+            const controller = new TimerController(model, null);
+            
+            controller.start(60);
+            
+            runner.assertEqual(model.initialSeconds, 60);
+            runner.assertEqual(model.remainingMs, 60000);
+            runner.assertEqual(model.status, 'running');
+            runner.assertTrue(model.lastTickTime !== null);
+        });
+
+        runner.test('TimerController: start() - ステータスがrunningになる', () => {
+            const model = new TimerModel();
+            const controller = new TimerController(model, null);
+            
+            controller.start(30);
+            
+            runner.assertTrue(model.isRunning());
+            runner.assertFalse(model.isPaused());
+        });
+
+        runner.test('TimerController: start() - コールバックが呼び出される', () => {
+            const model = new TimerModel();
+            let callbackCalled = false;
+            let callbackModel = null;
+            
+            const controller = new TimerController(model, (m) => {
+                callbackCalled = true;
+                callbackModel = m;
+            });
+            
+            controller.start(10);
+            
+            runner.assertTrue(callbackCalled);
+            runner.assertEqual(callbackModel, model);
+            
+            // クリーンアップ
+            controller.reset();
+        });
+
+        runner.test('TimerController: start() - 異なる秒数で正しく初期化', () => {
+            const model = new TimerModel();
+            const controller = new TimerController(model, null);
+            
+            controller.start(300); // 5分
+            
+            runner.assertEqual(model.initialSeconds, 300);
+            runner.assertEqual(model.remainingMs, 300000);
+            
+            // クリーンアップ
+            controller.reset();
+        });
+
+        // --- pause() テスト ---
+        runner.test('TimerController: pause() - ステータスがpausedになる', () => {
+            const model = new TimerModel();
+            const controller = new TimerController(model, null);
+            
+            controller.start(60);
+            controller.pause();
+            
+            runner.assertEqual(model.status, 'paused');
+            runner.assertTrue(model.isPaused());
+            runner.assertFalse(model.isRunning());
+        });
+
+        runner.test('TimerController: pause() - lastTickTimeがnullになる', () => {
+            const model = new TimerModel();
+            const controller = new TimerController(model, null);
+            
+            controller.start(60);
+            runner.assertTrue(model.lastTickTime !== null);
+            
+            controller.pause();
+            runner.assertEqual(model.lastTickTime, null);
+        });
+
+        runner.test('TimerController: pause() - コールバックが呼び出される', () => {
+            const model = new TimerModel();
+            let callCount = 0;
+            
+            const controller = new TimerController(model, () => {
+                callCount++;
+            });
+            
+            controller.start(60);
+            const countAfterStart = callCount;
+            
+            controller.pause();
+            
+            runner.assertEqual(callCount, countAfterStart + 1);
+        });
+
+        runner.test('TimerController: pause() - 実行中でない場合は何もしない', () => {
+            const model = new TimerModel();
+            let callCount = 0;
+            
+            const controller = new TimerController(model, () => {
+                callCount++;
+            });
+            
+            // idleの状態でpauseを呼び出し
+            controller.pause();
+            
+            runner.assertEqual(callCount, 0);
+            runner.assertEqual(model.status, 'idle');
+        });
+
+        runner.test('TimerController: pause() - 一時停止中に再度呼び出しても何もしない', () => {
+            const model = new TimerModel();
+            const controller = new TimerController(model, null);
+            
+            controller.start(60);
+            controller.pause();
+            
+            const remainingMsAfterFirstPause = model.remainingMs;
+            
+            controller.pause();
+            
+            runner.assertEqual(model.status, 'paused');
+            runner.assertEqual(model.remainingMs, remainingMsAfterFirstPause);
+        });
+
+        // --- resume() テスト ---
+        runner.test('TimerController: resume() - ステータスがrunningに戻る', () => {
+            const model = new TimerModel();
+            const controller = new TimerController(model, null);
+            
+            controller.start(60);
+            controller.pause();
+            runner.assertTrue(model.isPaused());
+            
+            controller.resume();
+            
+            runner.assertEqual(model.status, 'running');
+            runner.assertTrue(model.isRunning());
+            runner.assertFalse(model.isPaused());
+            
+            // クリーンアップ
+            controller.reset();
+        });
+
+        runner.test('TimerController: resume() - lastTickTimeが設定される', () => {
+            const model = new TimerModel();
+            const controller = new TimerController(model, null);
+            
+            controller.start(60);
+            controller.pause();
+            runner.assertEqual(model.lastTickTime, null);
+            
+            controller.resume();
+            
+            runner.assertTrue(model.lastTickTime !== null);
+            
+            // クリーンアップ
+            controller.reset();
+        });
+
+        runner.test('TimerController: resume() - コールバックが呼び出される', () => {
+            const model = new TimerModel();
+            let callCount = 0;
+            
+            const controller = new TimerController(model, () => {
+                callCount++;
+            });
+            
+            controller.start(60);
+            controller.pause();
+            const countAfterPause = callCount;
+            
+            controller.resume();
+            
+            runner.assertEqual(callCount, countAfterPause + 1);
+            
+            // クリーンアップ
+            controller.reset();
+        });
+
+        runner.test('TimerController: resume() - 一時停止中でない場合は何もしない', () => {
+            const model = new TimerModel();
+            let callCount = 0;
+            
+            const controller = new TimerController(model, () => {
+                callCount++;
+            });
+            
+            // idleの状態でresumeを呼び出し
+            controller.resume();
+            
+            runner.assertEqual(callCount, 0);
+            runner.assertEqual(model.status, 'idle');
+        });
+
+        runner.test('TimerController: resume() - 実行中に呼び出しても何もしない', () => {
+            const model = new TimerModel();
+            let callCount = 0;
+            
+            const controller = new TimerController(model, () => {
+                callCount++;
+            });
+            
+            controller.start(60);
+            const countAfterStart = callCount;
+            
+            controller.resume();
+            
+            runner.assertEqual(callCount, countAfterStart);
+            runner.assertEqual(model.status, 'running');
+            
+            // クリーンアップ
+            controller.reset();
+        });
+
+        // --- reset() テスト ---
+        runner.test('TimerController: reset() - モデルを初期状態にリセット', () => {
+            const model = new TimerModel();
+            const controller = new TimerController(model, null);
+            
+            controller.start(60);
+            controller.reset();
+            
+            runner.assertEqual(model.initialSeconds, 0);
+            runner.assertEqual(model.remainingMs, 0);
+            runner.assertEqual(model.status, 'idle');
+            runner.assertEqual(model.lastTickTime, null);
+        });
+
+        runner.test('TimerController: reset() - 実行中からリセット', () => {
+            const model = new TimerModel();
+            const controller = new TimerController(model, null);
+            
+            controller.start(60);
+            runner.assertTrue(model.isRunning());
+            
+            controller.reset();
+            
+            runner.assertFalse(model.isRunning());
+            runner.assertFalse(model.isPaused());
+            runner.assertEqual(model.status, 'idle');
+        });
+
+        runner.test('TimerController: reset() - 一時停止中からリセット', () => {
+            const model = new TimerModel();
+            const controller = new TimerController(model, null);
+            
+            controller.start(60);
+            controller.pause();
+            runner.assertTrue(model.isPaused());
+            
+            controller.reset();
+            
+            runner.assertFalse(model.isRunning());
+            runner.assertFalse(model.isPaused());
+            runner.assertEqual(model.status, 'idle');
+        });
+
+        runner.test('TimerController: reset() - コールバックが呼び出される', () => {
+            const model = new TimerModel();
+            let callCount = 0;
+            
+            const controller = new TimerController(model, () => {
+                callCount++;
+            });
+            
+            controller.start(60);
+            const countAfterStart = callCount;
+            
+            controller.reset();
+            
+            runner.assertEqual(callCount, countAfterStart + 1);
+        });
+
+        runner.test('TimerController: reset() - idle状態でもリセット可能', () => {
+            const model = new TimerModel();
+            let callCount = 0;
+            
+            const controller = new TimerController(model, () => {
+                callCount++;
+            });
+            
+            controller.reset();
+            
+            runner.assertEqual(callCount, 1);
+            runner.assertEqual(model.status, 'idle');
+        });
+
+        // --- toggle() テスト ---
+        runner.test('TimerController: toggle() - 実行中から一時停止に切り替え', () => {
+            const model = new TimerModel();
+            const controller = new TimerController(model, null);
+            
+            controller.start(60);
+            runner.assertTrue(model.isRunning());
+            
+            controller.toggle();
+            
+            runner.assertTrue(model.isPaused());
+            runner.assertFalse(model.isRunning());
+        });
+
+        runner.test('TimerController: toggle() - 一時停止から実行中に切り替え', () => {
+            const model = new TimerModel();
+            const controller = new TimerController(model, null);
+            
+            controller.start(60);
+            controller.pause();
+            runner.assertTrue(model.isPaused());
+            
+            controller.toggle();
+            
+            runner.assertTrue(model.isRunning());
+            runner.assertFalse(model.isPaused());
+            
+            // クリーンアップ
+            controller.reset();
+        });
+
+        runner.test('TimerController: toggle() - idle状態では何もしない', () => {
+            const model = new TimerModel();
+            let callCount = 0;
+            
+            const controller = new TimerController(model, () => {
+                callCount++;
+            });
+            
+            controller.toggle();
+            
+            runner.assertEqual(callCount, 0);
+            runner.assertEqual(model.status, 'idle');
+        });
+
+        runner.test('TimerController: toggle() - 連続切り替えが正しく動作', () => {
+            const model = new TimerModel();
+            const controller = new TimerController(model, null);
+            
+            controller.start(60);
+            runner.assertTrue(model.isRunning());
+            
+            controller.toggle(); // running -> paused
+            runner.assertTrue(model.isPaused());
+            
+            controller.toggle(); // paused -> running
+            runner.assertTrue(model.isRunning());
+            
+            controller.toggle(); // running -> paused
+            runner.assertTrue(model.isPaused());
+            
+            // クリーンアップ
+            controller.reset();
+        });
+
+        // --- ゼロ到達後の継続テスト (Requirements: 4.1) ---
+        runner.test('TimerController: ゼロ到達後もモデルは負の値を保持可能', () => {
+            const model = new TimerModel();
+            const controller = new TimerController(model, null);
+            
+            // 直接モデルの値を設定してテスト（非同期のティック処理を避ける）
+            controller.start(1);
+            
+            // 手動で残り時間を負の値に設定
+            model.remainingMs = -5000;
+            
+            runner.assertTrue(model.isNegative());
+            runner.assertEqual(model.getRemainingSeconds(), -5);
+            
+            // クリーンアップ
+            controller.reset();
+        });
+
+        runner.test('TimerController: 負の値でも一時停止・再開が動作', () => {
+            const model = new TimerModel();
+            const controller = new TimerController(model, null);
+            
+            controller.start(1);
+            
+            // 手動で残り時間を負の値に設定
+            model.remainingMs = -10000;
+            
+            controller.pause();
+            runner.assertTrue(model.isPaused());
+            runner.assertTrue(model.isNegative());
+            
+            controller.resume();
+            runner.assertTrue(model.isRunning());
+            runner.assertTrue(model.isNegative());
+            
+            // クリーンアップ
+            controller.reset();
+        });
+
+        runner.test('TimerController: 負の値からリセットすると初期状態に戻る', () => {
+            const model = new TimerModel();
+            const controller = new TimerController(model, null);
+            
+            controller.start(1);
+            
+            // 手動で残り時間を負の値に設定
+            model.remainingMs = -30000;
+            
+            runner.assertTrue(model.isNegative());
+            
+            controller.reset();
+            
+            runner.assertFalse(model.isNegative());
+            runner.assertEqual(model.remainingMs, 0);
+            runner.assertEqual(model.status, 'idle');
+        });
+
+        // --- コールバックなしのテスト ---
+        runner.test('TimerController: コールバックがnullでもエラーにならない', () => {
+            const model = new TimerModel();
+            const controller = new TimerController(model, null);
+            
+            // エラーが発生しないことを確認
+            controller.start(60);
+            controller.pause();
+            controller.resume();
+            controller.reset();
+            
+            runner.assertEqual(model.status, 'idle');
+        });
+
+        // --- 状態遷移の完全サイクルテスト ---
+        runner.test('TimerController: 完全な状態遷移サイクル（start -> pause -> resume -> reset）', () => {
+            const model = new TimerModel();
+            const states = [];
+            
+            const controller = new TimerController(model, (m) => {
+                states.push(m.status);
+            });
+            
+            // idle -> running
+            controller.start(60);
+            runner.assertEqual(model.status, 'running');
+            
+            // running -> paused
+            controller.pause();
+            runner.assertEqual(model.status, 'paused');
+            
+            // paused -> running
+            controller.resume();
+            runner.assertEqual(model.status, 'running');
+            
+            // running -> idle
+            controller.reset();
+            runner.assertEqual(model.status, 'idle');
+            
+            // コールバックが正しい順序で呼ばれたことを確認
+            runner.assertEqual(states.length, 4);
+            runner.assertEqual(states[0], 'running');
+            runner.assertEqual(states[1], 'paused');
+            runner.assertEqual(states[2], 'running');
+            runner.assertEqual(states[3], 'idle');
+        });
+
+        // ========================================
+        // DisplayRenderer クラス定義
+        // Requirements: 3.1, 4.2, 4.3
+        // ========================================
+        
+        /**
+         * 表示の更新を行うレンダラー
+         * Requirements: 3.1, 4.2, 4.3
+         */
+        class DisplayRenderer {
+            /**
+             * @param {Object} elements - DOM要素の参照
+             * @param {HTMLElement} elements.inputScreen - 入力画面要素
+             * @param {HTMLElement} elements.countdownScreen - カウントダウン画面要素
+             * @param {HTMLElement} elements.timerDisplay - タイマー表示要素
+             * @param {HTMLElement} elements.errorMessage - エラーメッセージ要素
+             */
+            constructor(elements) {
+                /** @type {HTMLElement} */
+                this.inputScreen = elements.inputScreen;
+                /** @type {HTMLElement} */
+                this.countdownScreen = elements.countdownScreen;
+                /** @type {HTMLElement} */
+                this.timerDisplay = elements.timerDisplay;
+                /** @type {HTMLElement} */
+                this.errorMessage = elements.errorMessage;
+            }
+            
+            /**
+             * タイマー表示を更新（MM:SS形式、マイナス表示対応）
+             * Requirements: 3.1, 4.2, 4.3
+             * @param {TimerModel} model - タイマーモデル
+             */
+            updateDisplay(model) {
+                if (!this.timerDisplay) {
+                    return;
+                }
+                
+                const seconds = model.getRemainingSeconds();
+                const formattedTime = this.formatTime(seconds);
+                this.timerDisplay.textContent = formattedTime;
+                
+                // 超過状態の視覚的強調（Requirements: 4.3）
+                if (model.isNegative()) {
+                    this.timerDisplay.classList.add('overtime');
+                } else {
+                    this.timerDisplay.classList.remove('overtime');
+                }
+            }
+            
+            /**
+             * 画面を切り替え
+             * @param {string} screenName - 'input' または 'countdown'
+             */
+            showScreen(screenName) {
+                if (screenName === 'input') {
+                    if (this.inputScreen) {
+                        this.inputScreen.style.display = '';
+                    }
+                    if (this.countdownScreen) {
+                        this.countdownScreen.style.display = 'none';
+                    }
+                } else if (screenName === 'countdown') {
+                    if (this.inputScreen) {
+                        this.inputScreen.style.display = 'none';
+                    }
+                    if (this.countdownScreen) {
+                        this.countdownScreen.style.display = '';
+                    }
+                }
+            }
+            
+            /**
+             * エラーメッセージを表示
+             * @param {string} message - エラーメッセージ（空文字でクリア）
+             */
+            showError(message) {
+                if (this.errorMessage) {
+                    this.errorMessage.textContent = message || '';
+                }
+            }
+            
+            /**
+             * 秒数をMM:SS形式にフォーマット（マイナス対応）
+             * Requirements: 4.2
+             * @param {number} seconds - 秒数（負の値も可）
+             * @returns {string} フォーマットされた時間文字列
+             */
+            formatTime(seconds) {
+                const isNegative = seconds < 0;
+                const absSeconds = Math.abs(seconds);
+                
+                const minutes = Math.floor(absSeconds / 60);
+                const secs = absSeconds % 60;
+                
+                const mm = String(minutes).padStart(2, '0');
+                const ss = String(secs).padStart(2, '0');
+                
+                return isNegative ? `-${mm}:${ss}` : `${mm}:${ss}`;
+            }
+        }
+
+        // ========================================
+        // DisplayRenderer テスト
+        // Requirements: 3.1, 4.2, 4.3
+        // ========================================
+        console.log('\n=== DisplayRenderer Tests ===');
+
+        // --- formatTime テスト（正の値） ---
+        runner.test('DisplayRenderer: formatTime - 0秒は"00:00"', () => {
+            const renderer = new DisplayRenderer({});
+            runner.assertEqual(renderer.formatTime(0), '00:00');
+        });
+
+        runner.test('DisplayRenderer: formatTime - 1秒は"00:01"', () => {
+            const renderer = new DisplayRenderer({});
+            runner.assertEqual(renderer.formatTime(1), '00:01');
+        });
+
+        runner.test('DisplayRenderer: formatTime - 59秒は"00:59"', () => {
+            const renderer = new DisplayRenderer({});
+            runner.assertEqual(renderer.formatTime(59), '00:59');
+        });
+
+        runner.test('DisplayRenderer: formatTime - 60秒は"01:00"', () => {
+            const renderer = new DisplayRenderer({});
+            runner.assertEqual(renderer.formatTime(60), '01:00');
+        });
+
+        runner.test('DisplayRenderer: formatTime - 61秒は"01:01"', () => {
+            const renderer = new DisplayRenderer({});
+            runner.assertEqual(renderer.formatTime(61), '01:01');
+        });
+
+        runner.test('DisplayRenderer: formatTime - 330秒（5分30秒）は"05:30"', () => {
+            const renderer = new DisplayRenderer({});
+            runner.assertEqual(renderer.formatTime(330), '05:30');
+        });
+
+        runner.test('DisplayRenderer: formatTime - 5999秒（99分59秒）は"99:59"', () => {
+            const renderer = new DisplayRenderer({});
+            runner.assertEqual(renderer.formatTime(5999), '99:59');
+        });
+
+        // --- formatTime テスト（負の値） Requirements: 4.2 ---
+        runner.test('DisplayRenderer: formatTime - -1秒は"-00:01"', () => {
+            const renderer = new DisplayRenderer({});
+            runner.assertEqual(renderer.formatTime(-1), '-00:01');
+        });
+
+        runner.test('DisplayRenderer: formatTime - -15秒は"-00:15"', () => {
+            const renderer = new DisplayRenderer({});
+            runner.assertEqual(renderer.formatTime(-15), '-00:15');
+        });
+
+        runner.test('DisplayRenderer: formatTime - -60秒は"-01:00"', () => {
+            const renderer = new DisplayRenderer({});
+            runner.assertEqual(renderer.formatTime(-60), '-01:00');
+        });
+
+        runner.test('DisplayRenderer: formatTime - -90秒は"-01:30"', () => {
+            const renderer = new DisplayRenderer({});
+            runner.assertEqual(renderer.formatTime(-90), '-01:30');
+        });
+
+        runner.test('DisplayRenderer: formatTime - -300秒（-5分）は"-05:00"', () => {
+            const renderer = new DisplayRenderer({});
+            runner.assertEqual(renderer.formatTime(-300), '-05:00');
+        });
+
+        // --- updateDisplay テスト ---
+        runner.test('DisplayRenderer: updateDisplay - 正の値の表示', () => {
+            const timerDisplay = document.createElement('div');
+            const renderer = new DisplayRenderer({ timerDisplay });
+            const model = new TimerModel();
+            model.remainingMs = 330000; // 5分30秒
+            
+            renderer.updateDisplay(model);
+            
+            runner.assertEqual(timerDisplay.textContent, '05:30');
+            runner.assertFalse(timerDisplay.classList.contains('overtime'));
+        });
+
+        runner.test('DisplayRenderer: updateDisplay - ゼロの表示', () => {
+            const timerDisplay = document.createElement('div');
+            const renderer = new DisplayRenderer({ timerDisplay });
+            const model = new TimerModel();
+            model.remainingMs = 0;
+            
+            renderer.updateDisplay(model);
+            
+            runner.assertEqual(timerDisplay.textContent, '00:00');
+            runner.assertFalse(timerDisplay.classList.contains('overtime'));
+        });
+
+        runner.test('DisplayRenderer: updateDisplay - 負の値の表示（Requirements: 4.2, 4.3）', () => {
+            const timerDisplay = document.createElement('div');
+            const renderer = new DisplayRenderer({ timerDisplay });
+            const model = new TimerModel();
+            model.remainingMs = -15000; // -15秒
+            
+            renderer.updateDisplay(model);
+            
+            runner.assertEqual(timerDisplay.textContent, '-00:15');
+            runner.assertTrue(timerDisplay.classList.contains('overtime'));
+        });
+
+        runner.test('DisplayRenderer: updateDisplay - 超過状態からの復帰でovertimeクラスが削除される', () => {
+            const timerDisplay = document.createElement('div');
+            const renderer = new DisplayRenderer({ timerDisplay });
+            const model = new TimerModel();
+            
+            // まず負の値で表示
+            model.remainingMs = -5000;
+            renderer.updateDisplay(model);
+            runner.assertTrue(timerDisplay.classList.contains('overtime'));
+            
+            // 正の値に戻す
+            model.remainingMs = 5000;
+            renderer.updateDisplay(model);
+            runner.assertFalse(timerDisplay.classList.contains('overtime'));
+        });
+
+        runner.test('DisplayRenderer: updateDisplay - timerDisplayがnullでもエラーにならない', () => {
+            const renderer = new DisplayRenderer({});
+            const model = new TimerModel();
+            model.remainingMs = 60000;
+            
+            // エラーが発生しないことを確認
+            renderer.updateDisplay(model);
+            runner.assertTrue(true);
+        });
+
+        // --- showScreen テスト ---
+        runner.test('DisplayRenderer: showScreen - inputを表示', () => {
+            const inputScreen = document.createElement('div');
+            const countdownScreen = document.createElement('div');
+            inputScreen.style.display = 'none';
+            countdownScreen.style.display = '';
+            
+            const renderer = new DisplayRenderer({ inputScreen, countdownScreen });
+            renderer.showScreen('input');
+            
+            runner.assertEqual(inputScreen.style.display, '');
+            runner.assertEqual(countdownScreen.style.display, 'none');
+        });
+
+        runner.test('DisplayRenderer: showScreen - countdownを表示', () => {
+            const inputScreen = document.createElement('div');
+            const countdownScreen = document.createElement('div');
+            inputScreen.style.display = '';
+            countdownScreen.style.display = 'none';
+            
+            const renderer = new DisplayRenderer({ inputScreen, countdownScreen });
+            renderer.showScreen('countdown');
+            
+            runner.assertEqual(inputScreen.style.display, 'none');
+            runner.assertEqual(countdownScreen.style.display, '');
+        });
+
+        runner.test('DisplayRenderer: showScreen - 要素がnullでもエラーにならない', () => {
+            const renderer = new DisplayRenderer({});
+            
+            // エラーが発生しないことを確認
+            renderer.showScreen('input');
+            renderer.showScreen('countdown');
+            runner.assertTrue(true);
+        });
+
+        // --- showError テスト ---
+        runner.test('DisplayRenderer: showError - エラーメッセージを表示', () => {
+            const errorMessage = document.createElement('div');
+            const renderer = new DisplayRenderer({ errorMessage });
+            
+            renderer.showError('テストエラー');
+            
+            runner.assertEqual(errorMessage.textContent, 'テストエラー');
+        });
+
+        runner.test('DisplayRenderer: showError - 空文字でクリア', () => {
+            const errorMessage = document.createElement('div');
+            errorMessage.textContent = '既存のエラー';
+            const renderer = new DisplayRenderer({ errorMessage });
+            
+            renderer.showError('');
+            
+            runner.assertEqual(errorMessage.textContent, '');
+        });
+
+        runner.test('DisplayRenderer: showError - nullでクリア', () => {
+            const errorMessage = document.createElement('div');
+            errorMessage.textContent = '既存のエラー';
+            const renderer = new DisplayRenderer({ errorMessage });
+            
+            renderer.showError(null);
+            
+            runner.assertEqual(errorMessage.textContent, '');
+        });
+
+        runner.test('DisplayRenderer: showError - undefinedでクリア', () => {
+            const errorMessage = document.createElement('div');
+            errorMessage.textContent = '既存のエラー';
+            const renderer = new DisplayRenderer({ errorMessage });
+            
+            renderer.showError(undefined);
+            
+            runner.assertEqual(errorMessage.textContent, '');
+        });
+
+        runner.test('DisplayRenderer: showError - 要素がnullでもエラーにならない', () => {
+            const renderer = new DisplayRenderer({});
+            
+            // エラーが発生しないことを確認
+            renderer.showError('テストエラー');
+            runner.assertTrue(true);
+        });
+
+        // ========================================
+        // AnimationController クラス定義
+        // Requirements: 5.3, 5.4, 5.5
+        // ========================================
+        
+        /**
+         * アニメーションを制御するコントローラー
+         * Requirements: 5.3, 5.4, 5.5
+         */
+        class AnimationController {
+            /**
+             * @param {HTMLElement} timerDisplay - タイマー表示要素
+             */
+            constructor(timerDisplay) {
+                /** @type {HTMLElement} */
+                this.timerDisplay = timerDisplay;
+                /** @type {string[]} アニメーションクラス名の一覧 */
+                this._animationClasses = ['animation-normal', 'animation-blink', 'animation-critical'];
+            }
+            
+            /**
+             * 通常アニメーションを開始（警告感を演出）
+             * Requirements: 5.3
+             */
+            startNormal() {
+                this._removeAllAnimations();
+                if (this.timerDisplay) {
+                    this.timerDisplay.classList.add('animation-normal');
+                }
+            }
+            
+            /**
+             * 点滅アニメーションを開始（残り10秒以下）
+             * Requirements: 5.4
+             */
+            startBlink() {
+                this._removeAllAnimations();
+                if (this.timerDisplay) {
+                    this.timerDisplay.classList.add('animation-blink');
+                }
+            }
+            
+            /**
+             * 強調アニメーションを開始（超過時）
+             * Requirements: 5.5
+             */
+            startCritical() {
+                this._removeAllAnimations();
+                if (this.timerDisplay) {
+                    this.timerDisplay.classList.add('animation-critical');
+                }
+            }
+            
+            /**
+             * アニメーションを停止
+             */
+            stop() {
+                this._removeAllAnimations();
+            }
+            
+            /**
+             * 残り時間に応じてアニメーションを自動選択・適用
+             * Requirements: 5.3, 5.4, 5.5
+             * @param {TimerModel} model - タイマーモデル
+             */
+            updateAnimation(model) {
+                // 実行中でなければアニメーションを停止
+                if (!model.isRunning()) {
+                    this.stop();
+                    return;
+                }
+                
+                const remainingSeconds = model.getRemainingSeconds();
+                
+                if (remainingSeconds < 0) {
+                    // 負の値（超過時）: 強調アニメーション
+                    this.startCritical();
+                } else if (remainingSeconds <= 10) {
+                    // 0-10秒: 点滅アニメーション
+                    this.startBlink();
+                } else {
+                    // 11秒以上: 通常アニメーション
+                    this.startNormal();
+                }
+            }
+            
+            /**
+             * すべてのアニメーションクラスを削除
+             * @private
+             */
+            _removeAllAnimations() {
+                if (this.timerDisplay) {
+                    this._animationClasses.forEach(cls => {
+                        this.timerDisplay.classList.remove(cls);
+                    });
+                }
+            }
+        }
+
+        // ========================================
+        // AnimationController テスト
+        // Requirements: 5.3, 5.4, 5.5
+        // ========================================
+        console.log('\n=== AnimationController Tests ===');
+
+        // --- startNormal テスト ---
+        runner.test('AnimationController: startNormal - animation-normalクラスを追加', () => {
+            const timerDisplay = document.createElement('div');
+            const controller = new AnimationController(timerDisplay);
+            
+            controller.startNormal();
+            
+            runner.assertTrue(timerDisplay.classList.contains('animation-normal'));
+            runner.assertFalse(timerDisplay.classList.contains('animation-blink'));
+            runner.assertFalse(timerDisplay.classList.contains('animation-critical'));
+        });
+
+        runner.test('AnimationController: startNormal - 他のアニメーションクラスを削除', () => {
+            const timerDisplay = document.createElement('div');
+            timerDisplay.classList.add('animation-blink', 'animation-critical');
+            const controller = new AnimationController(timerDisplay);
+            
+            controller.startNormal();
+            
+            runner.assertTrue(timerDisplay.classList.contains('animation-normal'));
+            runner.assertFalse(timerDisplay.classList.contains('animation-blink'));
+            runner.assertFalse(timerDisplay.classList.contains('animation-critical'));
+        });
+
+        runner.test('AnimationController: startNormal - 要素がnullでもエラーにならない', () => {
+            const controller = new AnimationController(null);
+            
+            // エラーが発生しないことを確認
+            controller.startNormal();
+            runner.assertTrue(true);
+        });
+
+        // --- startBlink テスト ---
+        runner.test('AnimationController: startBlink - animation-blinkクラスを追加', () => {
+            const timerDisplay = document.createElement('div');
+            const controller = new AnimationController(timerDisplay);
+            
+            controller.startBlink();
+            
+            runner.assertTrue(timerDisplay.classList.contains('animation-blink'));
+            runner.assertFalse(timerDisplay.classList.contains('animation-normal'));
+            runner.assertFalse(timerDisplay.classList.contains('animation-critical'));
+        });
+
+        runner.test('AnimationController: startBlink - 他のアニメーションクラスを削除', () => {
+            const timerDisplay = document.createElement('div');
+            timerDisplay.classList.add('animation-normal', 'animation-critical');
+            const controller = new AnimationController(timerDisplay);
+            
+            controller.startBlink();
+            
+            runner.assertTrue(timerDisplay.classList.contains('animation-blink'));
+            runner.assertFalse(timerDisplay.classList.contains('animation-normal'));
+            runner.assertFalse(timerDisplay.classList.contains('animation-critical'));
+        });
+
+        runner.test('AnimationController: startBlink - 要素がnullでもエラーにならない', () => {
+            const controller = new AnimationController(null);
+            
+            // エラーが発生しないことを確認
+            controller.startBlink();
+            runner.assertTrue(true);
+        });
+
+        // --- startCritical テスト ---
+        runner.test('AnimationController: startCritical - animation-criticalクラスを追加', () => {
+            const timerDisplay = document.createElement('div');
+            const controller = new AnimationController(timerDisplay);
+            
+            controller.startCritical();
+            
+            runner.assertTrue(timerDisplay.classList.contains('animation-critical'));
+            runner.assertFalse(timerDisplay.classList.contains('animation-normal'));
+            runner.assertFalse(timerDisplay.classList.contains('animation-blink'));
+        });
+
+        runner.test('AnimationController: startCritical - 他のアニメーションクラスを削除', () => {
+            const timerDisplay = document.createElement('div');
+            timerDisplay.classList.add('animation-normal', 'animation-blink');
+            const controller = new AnimationController(timerDisplay);
+            
+            controller.startCritical();
+            
+            runner.assertTrue(timerDisplay.classList.contains('animation-critical'));
+            runner.assertFalse(timerDisplay.classList.contains('animation-normal'));
+            runner.assertFalse(timerDisplay.classList.contains('animation-blink'));
+        });
+
+        runner.test('AnimationController: startCritical - 要素がnullでもエラーにならない', () => {
+            const controller = new AnimationController(null);
+            
+            // エラーが発生しないことを確認
+            controller.startCritical();
+            runner.assertTrue(true);
+        });
+
+        // --- stop テスト ---
+        runner.test('AnimationController: stop - すべてのアニメーションクラスを削除', () => {
+            const timerDisplay = document.createElement('div');
+            timerDisplay.classList.add('animation-normal', 'animation-blink', 'animation-critical');
+            const controller = new AnimationController(timerDisplay);
+            
+            controller.stop();
+            
+            runner.assertFalse(timerDisplay.classList.contains('animation-normal'));
+            runner.assertFalse(timerDisplay.classList.contains('animation-blink'));
+            runner.assertFalse(timerDisplay.classList.contains('animation-critical'));
+        });
+
+        runner.test('AnimationController: stop - 要素がnullでもエラーにならない', () => {
+            const controller = new AnimationController(null);
+            
+            // エラーが発生しないことを確認
+            controller.stop();
+            runner.assertTrue(true);
+        });
+
+        // --- updateAnimation テスト ---
+        runner.test('AnimationController: updateAnimation - 実行中でなければアニメーション停止', () => {
+            const timerDisplay = document.createElement('div');
+            timerDisplay.classList.add('animation-normal');
+            const controller = new AnimationController(timerDisplay);
+            const model = new TimerModel();
+            model.status = 'idle';
+            
+            controller.updateAnimation(model);
+            
+            runner.assertFalse(timerDisplay.classList.contains('animation-normal'));
+            runner.assertFalse(timerDisplay.classList.contains('animation-blink'));
+            runner.assertFalse(timerDisplay.classList.contains('animation-critical'));
+        });
+
+        runner.test('AnimationController: updateAnimation - 一時停止中はアニメーション停止', () => {
+            const timerDisplay = document.createElement('div');
+            timerDisplay.classList.add('animation-blink');
+            const controller = new AnimationController(timerDisplay);
+            const model = new TimerModel();
+            model.status = 'paused';
+            
+            controller.updateAnimation(model);
+            
+            runner.assertFalse(timerDisplay.classList.contains('animation-normal'));
+            runner.assertFalse(timerDisplay.classList.contains('animation-blink'));
+            runner.assertFalse(timerDisplay.classList.contains('animation-critical'));
+        });
+
+        runner.test('AnimationController: updateAnimation - 11秒以上は通常アニメーション', () => {
+            const timerDisplay = document.createElement('div');
+            const controller = new AnimationController(timerDisplay);
+            const model = new TimerModel();
+            model.status = 'running';
+            model.remainingMs = 11000; // 11秒
+            
+            controller.updateAnimation(model);
+            
+            runner.assertTrue(timerDisplay.classList.contains('animation-normal'));
+            runner.assertFalse(timerDisplay.classList.contains('animation-blink'));
+            runner.assertFalse(timerDisplay.classList.contains('animation-critical'));
+        });
+
+        runner.test('AnimationController: updateAnimation - 60秒は通常アニメーション', () => {
+            const timerDisplay = document.createElement('div');
+            const controller = new AnimationController(timerDisplay);
+            const model = new TimerModel();
+            model.status = 'running';
+            model.remainingMs = 60000; // 60秒
+            
+            controller.updateAnimation(model);
+            
+            runner.assertTrue(timerDisplay.classList.contains('animation-normal'));
+        });
+
+        runner.test('AnimationController: updateAnimation - 10秒は点滅アニメーション', () => {
+            const timerDisplay = document.createElement('div');
+            const controller = new AnimationController(timerDisplay);
+            const model = new TimerModel();
+            model.status = 'running';
+            model.remainingMs = 10000; // 10秒
+            
+            controller.updateAnimation(model);
+            
+            runner.assertFalse(timerDisplay.classList.contains('animation-normal'));
+            runner.assertTrue(timerDisplay.classList.contains('animation-blink'));
+            runner.assertFalse(timerDisplay.classList.contains('animation-critical'));
+        });
+
+        runner.test('AnimationController: updateAnimation - 5秒は点滅アニメーション', () => {
+            const timerDisplay = document.createElement('div');
+            const controller = new AnimationController(timerDisplay);
+            const model = new TimerModel();
+            model.status = 'running';
+            model.remainingMs = 5000; // 5秒
+            
+            controller.updateAnimation(model);
+            
+            runner.assertTrue(timerDisplay.classList.contains('animation-blink'));
+        });
+
+        runner.test('AnimationController: updateAnimation - 1秒は点滅アニメーション', () => {
+            const timerDisplay = document.createElement('div');
+            const controller = new AnimationController(timerDisplay);
+            const model = new TimerModel();
+            model.status = 'running';
+            model.remainingMs = 1000; // 1秒
+            
+            controller.updateAnimation(model);
+            
+            runner.assertTrue(timerDisplay.classList.contains('animation-blink'));
+        });
+
+        runner.test('AnimationController: updateAnimation - 0秒は点滅アニメーション', () => {
+            const timerDisplay = document.createElement('div');
+            const controller = new AnimationController(timerDisplay);
+            const model = new TimerModel();
+            model.status = 'running';
+            model.remainingMs = 0; // 0秒
+            
+            controller.updateAnimation(model);
+            
+            runner.assertTrue(timerDisplay.classList.contains('animation-blink'));
+        });
+
+        runner.test('AnimationController: updateAnimation - 負の値は強調アニメーション', () => {
+            const timerDisplay = document.createElement('div');
+            const controller = new AnimationController(timerDisplay);
+            const model = new TimerModel();
+            model.status = 'running';
+            model.remainingMs = -1000; // -1秒
+            
+            controller.updateAnimation(model);
+            
+            runner.assertFalse(timerDisplay.classList.contains('animation-normal'));
+            runner.assertFalse(timerDisplay.classList.contains('animation-blink'));
+            runner.assertTrue(timerDisplay.classList.contains('animation-critical'));
+        });
+
+        runner.test('AnimationController: updateAnimation - -30秒は強調アニメーション', () => {
+            const timerDisplay = document.createElement('div');
+            const controller = new AnimationController(timerDisplay);
+            const model = new TimerModel();
+            model.status = 'running';
+            model.remainingMs = -30000; // -30秒
+            
+            controller.updateAnimation(model);
+            
+            runner.assertTrue(timerDisplay.classList.contains('animation-critical'));
+        });
+
+        // --- 境界値テスト ---
+        runner.test('AnimationController: updateAnimation - 境界値10.999秒は点滅アニメーション', () => {
+            const timerDisplay = document.createElement('div');
+            const controller = new AnimationController(timerDisplay);
+            const model = new TimerModel();
+            model.status = 'running';
+            model.remainingMs = 10999; // 10.999秒 -> getRemainingSeconds() = 10
+            
+            controller.updateAnimation(model);
+            
+            runner.assertTrue(timerDisplay.classList.contains('animation-blink'));
+        });
+
+        runner.test('AnimationController: updateAnimation - 境界値11.001秒は通常アニメーション', () => {
+            const timerDisplay = document.createElement('div');
+            const controller = new AnimationController(timerDisplay);
+            const model = new TimerModel();
+            model.status = 'running';
+            model.remainingMs = 11001; // 11.001秒 -> getRemainingSeconds() = 11
+            
+            controller.updateAnimation(model);
+            
+            runner.assertTrue(timerDisplay.classList.contains('animation-normal'));
+        });
+
+        runner.test('AnimationController: updateAnimation - 境界値-0.001秒は点滅アニメーション', () => {
+            const timerDisplay = document.createElement('div');
+            const controller = new AnimationController(timerDisplay);
+            const model = new TimerModel();
+            model.status = 'running';
+            model.remainingMs = -1; // -0.001秒 -> getRemainingSeconds() = 0
+            
+            controller.updateAnimation(model);
+            
+            // -1msはisNegative()がtrueだが、getRemainingSeconds()は0なので点滅
+            // 実際の実装では remainingSeconds < 0 をチェックしているので、
+            // getRemainingSeconds()が0を返す場合は点滅アニメーション
+            runner.assertTrue(timerDisplay.classList.contains('animation-blink'));
+        });
+
+        runner.test('AnimationController: updateAnimation - 境界値-1000msは強調アニメーション', () => {
+            const timerDisplay = document.createElement('div');
+            const controller = new AnimationController(timerDisplay);
+            const model = new TimerModel();
+            model.status = 'running';
+            model.remainingMs = -1000; // -1秒 -> getRemainingSeconds() = -1
+            
+            controller.updateAnimation(model);
+            
+            runner.assertTrue(timerDisplay.classList.contains('animation-critical'));
+        });
+
+        // Render results
+        runner.renderResults('test-results');
+        runner.renderSummary('summary');
+    </script>
+</body>
+</html>

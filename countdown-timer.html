@@ -1,0 +1,1020 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>カウントダウンタイマー</title>
+    <style>
+        /* CSS Variables */
+        :root {
+            --color-background: #0a0a0a;
+            --color-background-dark: #000000;
+            --color-secondary: #1a1a1a;
+            --color-text: #ffffff;
+            --color-text-muted: #888888;
+            --color-error: #ff4444;
+            
+            /* State colors */
+            --color-normal: #00ff88;
+            --color-normal-glow: rgba(0, 255, 136, 0.5);
+            --color-warning: #ffaa00;
+            --color-warning-glow: rgba(255, 170, 0, 0.5);
+            --color-critical: #ff0000;
+            --color-critical-glow: rgba(255, 0, 0, 0.8);
+            
+            /* Current state (changed by JS) */
+            --color-current: var(--color-normal);
+            --color-current-glow: var(--color-normal-glow);
+            
+            --spacing-xs: 0.25rem;
+            --spacing-sm: 0.5rem;
+            --spacing-md: 1rem;
+            --spacing-lg: 2rem;
+            --spacing-xl: 4rem;
+            
+            --font-size-sm: 0.875rem;
+            --font-size-md: 1rem;
+            --font-size-lg: 1.5rem;
+            --font-size-xl: 3rem;
+            
+            --border-radius: 4px;
+            --border-radius-lg: 8px;
+        }
+        
+        /* Base Reset */
+        *, *::before, *::after {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+        
+        body {
+            font-family: "Yu Mincho", "YuMincho", "Hiragino Mincho ProN", "Hiragino Mincho Pro", "MS PMincho", "MS Mincho", serif;
+            background-color: var(--color-background);
+            color: var(--color-text);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            overflow: hidden;
+        }
+        
+        /* ===== 7-Segment Digital Display (CSS Only) ===== */
+        .segment-display {
+            display: inline-flex;
+            align-items: flex-end;
+            gap: 0.1em;
+        }
+        
+        .digit {
+            position: relative;
+            width: 0.6em;
+            height: 1em;
+            margin: 0 0.05em;
+        }
+        
+        .digit .segment {
+            position: absolute;
+            background: var(--color-current);
+            opacity: 0.12;
+            transition: opacity 0.05s, background 0.3s;
+        }
+        
+        .digit .segment.on {
+            opacity: 1;
+            filter: drop-shadow(0 0 0.08em var(--color-current));
+        }
+        
+        /* Horizontal segments - using clip-path for pointed ends */
+        .digit .segment.h {
+            width: 72%;
+            height: 9%;
+            left: 14%;
+            clip-path: polygon(10% 0%, 90% 0%, 100% 50%, 90% 100%, 10% 100%, 0% 50%);
+        }
+        
+        /* Vertical segments - using clip-path for pointed ends */
+        .digit .segment.v {
+            width: 12%;
+            height: 44%;
+            clip-path: polygon(50% 0%, 100% 8%, 100% 92%, 50% 100%, 0% 92%, 0% 8%);
+        }
+        
+        /* Segment positions */
+        .digit .seg-a { top: 0; }
+        .digit .seg-b { top: 3%; right: 0; }
+        .digit .seg-c { top: 53%; right: 0; }
+        .digit .seg-d { bottom: 0; }
+        .digit .seg-e { top: 53%; left: 0; }
+        .digit .seg-f { top: 3%; left: 0; }
+        .digit .seg-g { top: 45.5%; }
+        
+        /* Colon separator */
+        .colon {
+            display: inline-flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            gap: 0.25em;
+            width: 0.2em;
+            height: 1em;
+        }
+        
+        .colon .dot {
+            width: 0.12em;
+            height: 0.12em;
+            background: var(--color-current);
+            border-radius: 50%;
+            box-shadow: 0 0 0.1em var(--color-current-glow);
+        }
+        
+        /* Decimal point */
+        .decimal {
+            display: inline-flex;
+            align-items: flex-end;
+            width: 0.15em;
+            height: 1em;
+            padding-bottom: 0.05em;
+        }
+        
+        .decimal .dot {
+            width: 0.1em;
+            height: 0.1em;
+            background: var(--color-current);
+            border-radius: 50%;
+            box-shadow: 0 0 0.1em var(--color-current-glow);
+        }
+        
+        /* Minus sign */
+        .minus {
+            display: inline-flex;
+            align-items: center;
+            width: 0.4em;
+            height: 1em;
+        }
+        
+        .minus .bar {
+            width: 100%;
+            height: 8%;
+            background: var(--color-current);
+            box-shadow: 0 0 0.1em var(--color-current-glow);
+        }
+        
+        /* Timer display container */
+        .timer-display {
+            font-size: clamp(3rem, 15vw, 10rem);
+            text-shadow: 0 0 20px var(--color-current-glow);
+        }
+        
+        /* Milliseconds - smaller */
+        .timer-ms {
+            font-size: 0.4em;
+            display: inline-flex;
+            align-items: flex-end;
+        }
+        
+        .timer-ms .digit {
+            width: 0.55em;
+        }
+        
+        /* Label text - Mincho style */
+        .timer-label {
+            font-family: "Yu Mincho", "YuMincho", "Hiragino Mincho ProN", "Hiragino Mincho Pro", "MS PMincho", "MS Mincho", serif;
+            font-size: clamp(0.8rem, 2vw, 1.2rem);
+            color: var(--color-current);
+            letter-spacing: 0.2em;
+            margin-bottom: var(--spacing-sm);
+            text-shadow: 0 0 10px var(--color-current-glow);
+            text-align: left;
+            transition: color 0.3s, text-shadow 0.3s;
+        }
+        
+        /* Screen containers */
+        .screen {
+            width: 100%;
+            max-width: 900px;
+            padding: var(--spacing-lg);
+            text-align: center;
+        }
+        
+        /* Button styles - uses current color */
+        .btn {
+            font-family: inherit;
+            font-size: var(--font-size-md);
+            padding: var(--spacing-sm) var(--spacing-lg);
+            border: 2px solid var(--color-current);
+            border-radius: var(--border-radius);
+            background-color: transparent;
+            color: var(--color-current);
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+        
+        .btn:hover:not(:disabled) {
+            background-color: var(--color-current);
+            color: var(--color-background);
+            box-shadow: 0 0 15px var(--color-current-glow);
+        }
+        
+        .btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+        
+        .btn-primary {
+            background-color: var(--color-current);
+            color: var(--color-background);
+        }
+        
+        .btn-primary:hover:not(:disabled) {
+            filter: brightness(0.85);
+            box-shadow: 0 0 20px var(--color-current-glow);
+        }
+        
+        /* Input styles */
+        .input {
+            font-family: monospace;
+            font-size: var(--font-size-xl);
+            padding: var(--spacing-sm) var(--spacing-md);
+            border: 2px solid var(--color-secondary);
+            border-radius: var(--border-radius);
+            background-color: var(--color-background-dark);
+            color: var(--color-current);
+            text-align: center;
+            width: 100%;
+            max-width: 120px;
+            font-weight: 700;
+            transition: color 0.3s, border-color 0.3s;
+        }
+        
+        .input:focus {
+            outline: none;
+            border-color: var(--color-current);
+            box-shadow: 0 0 10px var(--color-current-glow);
+        }
+        
+        .error-message {
+            color: var(--color-error);
+            font-size: var(--font-size-sm);
+            margin-top: var(--spacing-sm);
+            min-height: 1.5em;
+        }
+        
+        /* Responsive */
+        .input {
+            font-size: clamp(1.5rem, 5vw, var(--font-size-xl));
+            max-width: clamp(80px, 20vw, 120px);
+        }
+        
+        .btn {
+            font-size: clamp(0.875rem, 2.5vw, var(--font-size-md));
+            padding: clamp(var(--spacing-xs), 2vw, var(--spacing-sm)) clamp(var(--spacing-md), 4vw, var(--spacing-lg));
+        }
+        
+        /* Animations */
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.85; }
+        }
+        
+        @keyframes blink {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+        
+        @keyframes critical-pulse {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.02); }
+        }
+        
+        .animation-normal {
+            animation: pulse 2s ease-in-out infinite;
+        }
+        
+        .animation-blink {
+            animation: blink 0.5s ease-in-out infinite;
+        }
+        
+        .animation-critical {
+            animation: critical-pulse 0.8s ease-in-out infinite;
+        }
+        
+        @media (prefers-reduced-motion: reduce) {
+            .animation-normal, .animation-blink, .animation-critical {
+                animation: none;
+            }
+        }
+        
+        /* Input Screen */
+        .screen-title {
+            font-size: clamp(1.5rem, 4vw, 2.5rem);
+            color: var(--color-current);
+            margin-bottom: var(--spacing-xl);
+            text-shadow: 0 0 10px var(--color-current-glow);
+            font-weight: 300;
+            letter-spacing: 0.1em;
+            transition: color 0.3s, text-shadow 0.3s;
+        }
+        
+        .time-input-container {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: var(--spacing-md);
+            margin-bottom: var(--spacing-lg);
+        }
+        
+        .time-input-group {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: var(--spacing-sm);
+        }
+        
+        .time-label {
+            font-size: var(--font-size-sm);
+            color: var(--color-text-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.15em;
+        }
+        
+        .time-input {
+            width: clamp(80px, 20vw, 120px);
+            -moz-appearance: textfield;
+            appearance: textfield;
+        }
+        
+        .time-input::-webkit-outer-spin-button,
+        .time-input::-webkit-inner-spin-button {
+            -webkit-appearance: none;
+            margin: 0;
+        }
+        
+        .time-separator {
+            font-family: monospace;
+            font-size: clamp(2rem, 6vw, var(--font-size-xl));
+            color: var(--color-current);
+            margin-top: var(--spacing-lg);
+            font-weight: 700;
+            transition: color 0.3s;
+        }
+        
+        .start-button {
+            margin-top: var(--spacing-lg);
+            font-size: clamp(1rem, 3vw, var(--font-size-lg));
+            padding: var(--spacing-md) var(--spacing-xl);
+            min-width: 150px;
+        }
+        
+        /* Countdown Screen */
+        #countdown-screen {
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+        }
+        
+        .timer-wrapper {
+            display: flex;
+            flex-direction: column;
+            align-items: flex-start;
+            margin-bottom: var(--spacing-xl);
+        }
+        
+        .countdown-controls {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: var(--spacing-lg);
+            flex-wrap: wrap;
+        }
+        
+        .control-button {
+            width: 180px;
+            height: 60px;
+            display: inline-flex;
+            justify-content: center;
+            align-items: center;
+            white-space: nowrap;
+            font-size: clamp(1rem, 3vw, var(--font-size-lg));
+            padding: var(--spacing-md) var(--spacing-xl);
+        }
+        
+        /* Help Modal */
+        .help-modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.85);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+        }
+        
+        .help-modal-content {
+            background-color: var(--color-secondary);
+            border: 2px solid var(--color-current);
+            border-radius: var(--border-radius-lg);
+            padding: var(--spacing-lg);
+            max-width: 400px;
+            width: 90%;
+            box-shadow: 0 0 30px var(--color-current-glow);
+            transition: border-color 0.3s, box-shadow 0.3s;
+        }
+        
+        .help-modal-title {
+            font-size: var(--font-size-lg);
+            color: var(--color-current);
+            text-align: center;
+            margin-bottom: var(--spacing-lg);
+            text-shadow: 0 0 10px var(--color-current-glow);
+            transition: color 0.3s, text-shadow 0.3s;
+        }
+        
+        .shortcut-list {
+            list-style: none;
+        }
+        
+        .shortcut-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: var(--spacing-sm) 0;
+            border-bottom: 1px solid var(--color-background);
+        }
+        
+        .shortcut-item:last-child {
+            border-bottom: none;
+        }
+        
+        .shortcut-key {
+            font-family: monospace;
+            background-color: var(--color-background);
+            color: var(--color-current);
+            padding: var(--spacing-xs) var(--spacing-sm);
+            border-radius: var(--border-radius);
+            border: 1px solid var(--color-current);
+            min-width: 80px;
+            text-align: center;
+            font-size: var(--font-size-sm);
+            transition: color 0.3s, border-color 0.3s;
+        }
+        
+        .shortcut-description {
+            color: var(--color-text);
+            font-size: var(--font-size-md);
+        }
+        
+        .help-modal-close {
+            display: block;
+            margin: var(--spacing-lg) auto 0;
+            padding: var(--spacing-sm) var(--spacing-lg);
+        }
+        
+        .help-modal-hint {
+            text-align: center;
+            color: var(--color-text-muted);
+            font-size: var(--font-size-sm);
+            margin-top: var(--spacing-md);
+        }
+        
+        /* Mobile */
+        @media screen and (max-width: 480px) {
+            .timer-display {
+                font-size: clamp(2rem, 18vw, 5rem);
+            }
+            .timer-ms {
+                font-size: 0.35em;
+                display: inline-flex;
+                align-items: flex-end;
+            }
+            .time-input-container {
+                gap: var(--spacing-sm);
+            }
+            .countdown-controls {
+                gap: var(--spacing-md);
+            }
+            .control-button {
+                width: 140px;
+                height: 50px;
+                padding: var(--spacing-sm) var(--spacing-lg);
+            }
+        }
+        
+        @media (pointer: coarse) {
+            .btn { min-height: 44px; min-width: 44px; }
+            .input { min-height: 44px; }
+        }
+    </style>
+</head>
+<body>
+    <!-- 時間入力画面 -->
+    <div id="input-screen" class="screen">
+        <h1 class="screen-title">カウントダウンタイマー</h1>
+        
+        <div class="time-input-container">
+            <div class="time-input-group">
+                <label for="minutes-input" class="time-label">分</label>
+                <input type="number" id="minutes-input" class="input time-input" min="0" max="99" value="0" placeholder="00" aria-label="分">
+            </div>
+            <span class="time-separator" aria-hidden="true">:</span>
+            <div class="time-input-group">
+                <label for="seconds-input" class="time-label">秒</label>
+                <input type="number" id="seconds-input" class="input time-input" min="0" max="59" value="0" placeholder="00" aria-label="秒">
+            </div>
+        </div>
+        
+        <div id="error-message" class="error-message" role="alert" aria-live="polite"></div>
+        <button id="start-button" class="btn btn-primary start-button" type="button">スタート</button>
+    </div>
+
+    <!-- カウントダウン画面 -->
+    <div id="countdown-screen" class="screen" style="display: none;">
+        <div class="timer-wrapper">
+            <div class="timer-label">活動限界まであと</div>
+            <div id="timer-display" class="timer-display segment-display" aria-live="polite" aria-atomic="true"></div>
+        </div>
+        
+        <div class="countdown-controls">
+            <button id="toggle-button" class="btn btn-primary control-button" type="button">停止</button>
+            <button id="reset-button" class="btn control-button" type="button">リセット</button>
+        </div>
+    </div>
+
+    <!-- ヘルプモーダル -->
+    <div id="help-modal" class="help-modal-overlay" style="display: none;" role="dialog" aria-modal="true">
+        <div class="help-modal-content">
+            <h2 class="help-modal-title">キーボードショートカット</h2>
+            <ul class="shortcut-list">
+                <li class="shortcut-item"><span class="shortcut-key">Enter</span><span class="shortcut-description">スタート</span></li>
+                <li class="shortcut-item"><span class="shortcut-key">Space</span><span class="shortcut-description">停止 / 再開</span></li>
+                <li class="shortcut-item"><span class="shortcut-key">Escape</span><span class="shortcut-description">リセット</span></li>
+                <li class="shortcut-item"><span class="shortcut-key">?</span><span class="shortcut-description">ヘルプ</span></li>
+            </ul>
+            <button id="help-modal-close" class="btn btn-primary help-modal-close" type="button">閉じる</button>
+            <p class="help-modal-hint">モーダル外クリックで閉じる</p>
+        </div>
+    </div>
+
+    <script>
+        // 7-Segment digit patterns: [a,b,c,d,e,f,g]
+        const SEGMENT_PATTERNS = {
+            '0': [1,1,1,1,1,1,0],
+            '1': [0,1,1,0,0,0,0],
+            '2': [1,1,0,1,1,0,1],
+            '3': [1,1,1,1,0,0,1],
+            '4': [0,1,1,0,0,1,1],
+            '5': [1,0,1,1,0,1,1],
+            '6': [1,0,1,1,1,1,1],
+            '7': [1,1,1,0,0,0,0],
+            '8': [1,1,1,1,1,1,1],
+            '9': [1,1,1,1,0,1,1]
+        };
+        
+        // Create a single 7-segment digit element
+        function createDigitElement() {
+            const digit = document.createElement('div');
+            digit.className = 'digit';
+            
+            const segments = ['a','b','c','d','e','f','g'];
+            const types = ['h','v','v','h','v','v','h']; // horizontal or vertical
+            
+            segments.forEach((seg, i) => {
+                const el = document.createElement('div');
+                el.className = `segment ${types[i]} seg-${seg}`;
+                digit.appendChild(el);
+            });
+            
+            return digit;
+        }
+        
+        // Create colon separator
+        function createColon() {
+            const colon = document.createElement('div');
+            colon.className = 'colon';
+            colon.innerHTML = '<div class="dot"></div><div class="dot"></div>';
+            return colon;
+        }
+        
+        // Create decimal point
+        function createDecimal() {
+            const decimal = document.createElement('div');
+            decimal.className = 'decimal';
+            decimal.innerHTML = '<div class="dot"></div>';
+            return decimal;
+        }
+        
+        // Create minus sign
+        function createMinus() {
+            const minus = document.createElement('div');
+            minus.className = 'minus';
+            minus.innerHTML = '<div class="bar"></div>';
+            minus.style.display = 'none';
+            return minus;
+        }
+        
+        // Update digit to show a number
+        function updateDigit(digitEl, num) {
+            const pattern = SEGMENT_PATTERNS[num] || [0,0,0,0,0,0,0];
+            const segments = digitEl.querySelectorAll('.segment');
+            segments.forEach((seg, i) => {
+                seg.classList.toggle('on', pattern[i] === 1);
+            });
+        }
+        
+        // Timer Display Manager
+        class SegmentDisplayManager {
+            constructor(container) {
+                this.container = container;
+                this.minus = createMinus();
+                this.digits = {
+                    mm: [createDigitElement(), createDigitElement()],
+                    ss: [createDigitElement(), createDigitElement()],
+                    ms: [createDigitElement(), createDigitElement()]
+                };
+                this.colon = createColon();
+                this.decimal = createDecimal();
+                
+                // Build display structure
+                this.container.innerHTML = '';
+                this.container.appendChild(this.minus);
+                this.digits.mm.forEach(d => this.container.appendChild(d));
+                this.container.appendChild(this.colon);
+                this.digits.ss.forEach(d => this.container.appendChild(d));
+                
+                // Milliseconds wrapper
+                this.msWrapper = document.createElement('span');
+                this.msWrapper.className = 'timer-ms';
+                this.msWrapper.appendChild(this.decimal);
+                this.digits.ms.forEach(d => this.msWrapper.appendChild(d));
+                this.container.appendChild(this.msWrapper);
+                
+                // Initialize to 00:00.000
+                this.update(0, 0, 0, false);
+            }
+            
+            update(minutes, seconds, milliseconds, isNegative) {
+                this.minus.style.display = isNegative ? 'inline-flex' : 'none';
+                
+                const mm = String(minutes).padStart(2, '0');
+                const ss = String(seconds).padStart(2, '0');
+                const ms = String(Math.floor(milliseconds / 10)).padStart(2, '0');
+                
+                updateDigit(this.digits.mm[0], mm[0]);
+                updateDigit(this.digits.mm[1], mm[1]);
+                updateDigit(this.digits.ss[0], ss[0]);
+                updateDigit(this.digits.ss[1], ss[1]);
+                updateDigit(this.digits.ms[0], ms[0]);
+                updateDigit(this.digits.ms[1], ms[1]);
+            }
+        }
+        
+        // Color state manager
+        class ColorStateManager {
+            constructor() {
+                this.currentState = 'normal';
+            }
+            
+            setState(state) {
+                if (this.currentState === state) return;
+                this.currentState = state;
+                
+                const root = document.documentElement;
+                switch(state) {
+                    case 'warning':
+                        root.style.setProperty('--color-current', 'var(--color-warning)');
+                        root.style.setProperty('--color-current-glow', 'var(--color-warning-glow)');
+                        break;
+                    case 'critical':
+                        root.style.setProperty('--color-current', 'var(--color-critical)');
+                        root.style.setProperty('--color-current-glow', 'var(--color-critical-glow)');
+                        break;
+                    default:
+                        root.style.setProperty('--color-current', 'var(--color-normal)');
+                        root.style.setProperty('--color-current-glow', 'var(--color-normal-glow)');
+                }
+            }
+            
+            updateFromModel(model) {
+                if (!model.isRunning() && !model.isPaused()) {
+                    this.setState('normal');
+                    return;
+                }
+                
+                const seconds = model.getRemainingSeconds();
+                if (seconds < 0) {
+                    this.setState('critical');
+                } else if (seconds <= 10) {
+                    this.setState('warning');
+                } else {
+                    this.setState('normal');
+                }
+            }
+        }
+        
+        class TimerModel {
+            constructor() {
+                this.initialSeconds = 0;
+                this.remainingMs = 0;
+                this.status = 'idle';
+                this.lastTickTime = null;
+            }
+            
+            getRemainingSeconds() {
+                return Math.trunc(this.remainingMs / 1000);
+            }
+            
+            isNegative() {
+                return this.remainingMs < 0;
+            }
+            
+            isRunning() {
+                return this.status === 'running';
+            }
+            
+            isPaused() {
+                return this.status === 'paused';
+            }
+        }
+
+        class InputValidator {
+            validateMinutes(value) {
+                const parsed = this._parseInteger(value);
+                if (parsed.error) return { valid: false, error: parsed.error };
+                if (parsed.value < 0 || parsed.value > 99) {
+                    return { valid: false, error: '分は0〜99の範囲で入力してください' };
+                }
+                return { valid: true };
+            }
+            
+            validateSeconds(value) {
+                const parsed = this._parseInteger(value);
+                if (parsed.error) return { valid: false, error: parsed.error };
+                if (parsed.value < 0 || parsed.value > 59) {
+                    return { valid: false, error: '秒は0〜59の範囲で入力してください' };
+                }
+                return { valid: true };
+            }
+            
+            validateTotal(minutes, seconds) {
+                const minutesResult = this.validateMinutes(minutes);
+                if (!minutesResult.valid) return minutesResult;
+                const secondsResult = this.validateSeconds(seconds);
+                if (!secondsResult.valid) return secondsResult;
+                
+                const totalSeconds = this._parseInteger(minutes).value * 60 + this._parseInteger(seconds).value;
+                if (totalSeconds === 0) return { valid: false, error: '1秒以上の時間を入力してください' };
+                if (totalSeconds > 5999) return { valid: false, error: '最大99分59秒まで設定できます' };
+                return { valid: true };
+            }
+            
+            _parseInteger(value) {
+                if (value === '' || value === null || value === undefined) return { error: '値を入力してください' };
+                const num = Number(value);
+                if (isNaN(num)) return { error: '数値を入力してください' };
+                if (!Number.isInteger(num)) return { error: '整数を入力してください' };
+                return { value: num };
+            }
+        }
+
+        class TimerController {
+            constructor(model, onUpdate) {
+                this.model = model;
+                this.onUpdate = onUpdate;
+                this._animationFrameId = null;
+            }
+            
+            start(seconds) {
+                this.model.initialSeconds = seconds;
+                this.model.remainingMs = seconds * 1000;
+                this.model.status = 'running';
+                this.model.lastTickTime = performance.now();
+                if (this.onUpdate) this.onUpdate(this.model);
+                this._scheduleNextTick();
+            }
+            
+            pause() {
+                if (!this.model.isRunning()) return;
+                this._updateRemainingTime();
+                this.model.status = 'paused';
+                this.model.lastTickTime = null;
+                if (this._animationFrameId !== null) {
+                    cancelAnimationFrame(this._animationFrameId);
+                    this._animationFrameId = null;
+                }
+                if (this.onUpdate) this.onUpdate(this.model);
+            }
+            
+            resume() {
+                if (!this.model.isPaused()) return;
+                this.model.status = 'running';
+                this.model.lastTickTime = performance.now();
+                if (this.onUpdate) this.onUpdate(this.model);
+                this._scheduleNextTick();
+            }
+            
+            reset() {
+                if (this._animationFrameId !== null) {
+                    cancelAnimationFrame(this._animationFrameId);
+                    this._animationFrameId = null;
+                }
+                this.model.initialSeconds = 0;
+                this.model.remainingMs = 0;
+                this.model.status = 'idle';
+                this.model.lastTickTime = null;
+                if (this.onUpdate) this.onUpdate(this.model);
+            }
+            
+            toggle() {
+                if (this.model.isRunning()) this.pause();
+                else if (this.model.isPaused()) this.resume();
+            }
+            
+            _scheduleNextTick() {
+                this._animationFrameId = requestAnimationFrame(() => this._tick());
+            }
+            
+            _tick() {
+                if (!this.model.isRunning()) return;
+                this._updateRemainingTime();
+                if (this.onUpdate) this.onUpdate(this.model);
+                this._scheduleNextTick();
+            }
+            
+            _updateRemainingTime() {
+                if (this.model.lastTickTime === null) return;
+                const now = performance.now();
+                this.model.remainingMs -= (now - this.model.lastTickTime);
+                this.model.lastTickTime = now;
+            }
+        }
+
+        class AnimationController {
+            constructor(timerDisplay) {
+                this.timerDisplay = timerDisplay;
+                this._classes = ['animation-normal', 'animation-blink', 'animation-critical'];
+            }
+            
+            updateAnimation(model) {
+                if (!model.isRunning()) {
+                    this._removeAll();
+                    return;
+                }
+                const seconds = model.getRemainingSeconds();
+                this._removeAll();
+                if (seconds < 0) {
+                    this.timerDisplay.classList.add('animation-critical');
+                } else if (seconds <= 10) {
+                    this.timerDisplay.classList.add('animation-blink');
+                } else {
+                    this.timerDisplay.classList.add('animation-normal');
+                }
+            }
+            
+            stop() { this._removeAll(); }
+            
+            _removeAll() {
+                this._classes.forEach(c => this.timerDisplay.classList.remove(c));
+            }
+        }
+
+        class KeyboardHandler {
+            constructor(callbacks) {
+                Object.assign(this, callbacks);
+                this._boundHandler = this.handleKeyDown.bind(this);
+            }
+            
+            handleKeyDown(event) {
+                const screen = this.getCurrentScreen();
+                const helpVisible = this.isHelpVisible?.() || false;
+                
+                if (helpVisible) {
+                    if (event.key === 'Escape' || event.key === '?') {
+                        event.preventDefault();
+                        this.onToggleHelp?.();
+                    }
+                    return;
+                }
+                
+                switch (event.key) {
+                    case 'Enter':
+                        if (screen === 'input') { event.preventDefault(); this.onStart?.(); }
+                        break;
+                    case ' ':
+                        if (screen === 'countdown') { event.preventDefault(); this.onToggle?.(); }
+                        break;
+                    case 'Escape':
+                        event.preventDefault(); this.onReset?.();
+                        break;
+                    case '?':
+                        event.preventDefault(); this.onToggleHelp?.();
+                        break;
+                }
+            }
+            
+            attach() { document.addEventListener('keydown', this._boundHandler); }
+            detach() { document.removeEventListener('keydown', this._boundHandler); }
+        }
+
+        // Initialize
+        (function() {
+            const minutesInput = document.getElementById('minutes-input');
+            const secondsInput = document.getElementById('seconds-input');
+            const startButton = document.getElementById('start-button');
+            const errorMessageEl = document.getElementById('error-message');
+            const inputScreen = document.getElementById('input-screen');
+            const countdownScreen = document.getElementById('countdown-screen');
+            const timerDisplay = document.getElementById('timer-display');
+            const toggleButton = document.getElementById('toggle-button');
+            const resetButton = document.getElementById('reset-button');
+            const helpModal = document.getElementById('help-modal');
+            const helpModalClose = document.getElementById('help-modal-close');
+            
+            const validator = new InputValidator();
+            const model = new TimerModel();
+            const segmentDisplay = new SegmentDisplayManager(timerDisplay);
+            const colorManager = new ColorStateManager();
+            const animationController = new AnimationController(timerDisplay);
+            
+            function onTimerUpdate(model) {
+                const totalMs = model.remainingMs;
+                const isNegative = totalMs < 0;
+                const absTotalMs = Math.abs(totalMs);
+                
+                const totalSeconds = Math.floor(absTotalMs / 1000);
+                const minutes = Math.floor(totalSeconds / 60);
+                const seconds = totalSeconds % 60;
+                const milliseconds = Math.floor(absTotalMs % 1000);
+                
+                segmentDisplay.update(minutes, seconds, milliseconds, isNegative);
+                colorManager.updateFromModel(model);
+                animationController.updateAnimation(model);
+                
+                toggleButton.textContent = model.isRunning() ? '停止' : '再開';
+            }
+            
+            const controller = new TimerController(model, onTimerUpdate);
+            
+            function validateAndUpdateButton() {
+                const result = validator.validateTotal(minutesInput.value, secondsInput.value);
+                startButton.disabled = !result.valid;
+                errorMessageEl.textContent = result.valid ? '' : (result.error || '');
+            }
+            
+            function showScreen(name) {
+                inputScreen.style.display = name === 'input' ? '' : 'none';
+                countdownScreen.style.display = name === 'countdown' ? '' : 'none';
+            }
+            
+            function handleStart() {
+                const minutes = parseInt(minutesInput.value, 10) || 0;
+                const seconds = parseInt(secondsInput.value, 10) || 0;
+                const result = validator.validateTotal(minutes, seconds);
+                if (!result.valid) {
+                    errorMessageEl.textContent = result.error;
+                    return;
+                }
+                showScreen('countdown');
+                controller.start(minutes * 60 + seconds);
+            }
+            
+            function handleReset() {
+                controller.reset();
+                animationController.stop();
+                colorManager.setState('normal');
+                showScreen('input');
+                toggleButton.textContent = '停止';
+            }
+            
+            minutesInput.addEventListener('input', validateAndUpdateButton);
+            secondsInput.addEventListener('input', validateAndUpdateButton);
+            startButton.addEventListener('click', handleStart);
+            toggleButton.addEventListener('click', () => controller.toggle());
+            resetButton.addEventListener('click', handleReset);
+            
+            const getCurrentScreen = () => countdownScreen.style.display !== 'none' ? 'countdown' : 'input';
+            const isHelpVisible = () => helpModal.style.display !== 'none';
+            const toggleHelp = () => helpModal.style.display = isHelpVisible() ? 'none' : '';
+            
+            new KeyboardHandler({
+                onStart: handleStart,
+                onToggle: () => controller.toggle(),
+                onReset: handleReset,
+                onToggleHelp: toggleHelp,
+                getCurrentScreen,
+                isHelpVisible
+            }).attach();
+            
+            helpModalClose?.addEventListener('click', () => helpModal.style.display = 'none');
+            helpModal?.addEventListener('click', e => { if (e.target === helpModal) helpModal.style.display = 'none'; });
+            
+            startButton.disabled = true;
+            validateAndUpdateButton();
+        })();
+    </script>
+</body>
+</html>
